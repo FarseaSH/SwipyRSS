@@ -1,0 +1,22 @@
+{
+  "name": "swipyrss-tauri",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tauri": "cd ../.. && tauri",
+    "dev": "npm run tauri -- dev --config platforms/tauri/tauri.conf.json",
+    "build": "npm run tauri -- build --config platforms/tauri/tauri.conf.json",
+    "dev:frontend": "cd ../.. && vite --mode tauri",
+    "build:frontend": "cd ../.. && tsc -b tsconfig.node.json && tsc -p platforms/tauri/tsconfig.json && vite build --mode tauri",
+    "ios:init": "npm run tauri -- ios init",
+    "ios:dev": "npm run tauri -- ios dev --config platforms/tauri/tauri.conf.json",
+    "android:init": "npm run tauri -- android init",
+    "android:dev": "npm run tauri -- android dev --config platforms/tauri/tauri.conf.json"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

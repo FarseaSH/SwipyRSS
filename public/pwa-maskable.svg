@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SwipyRSS">
+  <rect width="512" height="512" fill="#263e5b"/>
+  <g transform="translate(51.2 51.2) scale(.8)">
+    <circle cx="154" cy="358" r="34" fill="#f7f9fb"/>
+    <path d="M142 244c70 0 126 56 126 126" fill="none" stroke="#f7f9fb" stroke-width="42" stroke-linecap="round"/>
+    <path d="M142 137c129 0 233 104 233 233" fill="none" stroke="#f7f9fb" stroke-width="42" stroke-linecap="round"/>
+  </g>
+</svg>

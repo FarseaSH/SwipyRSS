@@ -1,0 +1,6 @@
+/*
+ * Reuse shared styles and include this adapter's view when generating native utility classes.
+ * 复用公共样式，并在生成原生端工具类时扫描这个适配器的视图。
+ */
+@import "../../src/styles/index.css";
+@source ".";

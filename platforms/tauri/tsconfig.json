@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.app.json",
+  "compilerOptions": {
+    "paths": {
+      "@platform": ["platforms/tauri/index.ts"],
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["../../src", "./*.ts", "./*.tsx"]
+}
