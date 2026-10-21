@@ -1079,6 +1079,103 @@ export default function App({ platform }: { platform: AppPlatform }) {
     }
   }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient]);
 
+  /** Mark exactly one Feed, including its unloaded entries, without changing the selected scope. */
+  const markFeedRead = useCallback(async (feedId: string) => {
+    const targetScope = scope;
+    const targetMode = mode;
+    const confirmedAt = Date.now();
+    const beforeTimestampUsec = `${confirmedAt}000`;
+    const belongsToOperation = (article: Article) => article.feedId === feedId && article.publishedAt <= confirmedAt;
+
+    if (previewMode) {
+      for (const [id, article] of previewArticlesRef.current) {
+        if (belongsToOperation(article)) previewArticlesRef.current.set(id, { ...article, isRead: true });
+      }
+      const all = Array.from(previewArticlesRef.current.values());
+      setReadingListUnreadCount(all.filter((article) => !article.isRead).length);
+      setFeedUnreadCounts(createPreviewFeedUnreadCounts(previewFeeds, all));
+      recordFeedsMarkedRead(new Set([feedId]));
+      if (targetMode === "unread") {
+        const visible = applyPreviewScope(targetScope, targetMode);
+        setSelectedId(visible[0]?.id ?? null);
+        beginReadingSession(targetScope, targetMode, true);
+        setListRefreshKey((key) => key + 1);
+      } else {
+        setArticles((current) => current.map((article) => belongsToOperation(article) ? { ...article, isRead: true } : article));
+      }
+      notify("该 Feed 已全部标记为已读");
+      return;
+    }
+
+    const listSequence = ++requestSequenceRef.current;
+    const oldContinuation = continuation;
+    const invalidateMore = () => {
+      loadMoreRequestRef.current += 1;
+      loadMoreInFlightRef.current = false;
+      setLoadingMore(false);
+    };
+    invalidateMore();
+    setContinuation(undefined);
+    setLoadingList(true);
+    unreadMutationVersionRef.current += 1;
+    try {
+      await rssClient.markStreamRead({ streamId: feedId, beforeTimestampUsec });
+      // Older per-article failures must not roll back this successful bulk write.
+      const operationId = ++mutationSequenceRef.current;
+      for (const article of articles.filter(belongsToOperation)) latestMutationRef.current.set(`read:${article.id}`, operationId);
+      unreadMutationVersionRef.current += 1;
+      recordFeedsMarkedRead(new Set([feedId]));
+      if (listSequence !== requestSequenceRef.current) {
+        void reconcileUnreadCounts(false);
+        return;
+      }
+      invalidateMore();
+      // Reflect server success before refreshing, including when either refresh later fails.
+      setArticles((current) => targetMode === "unread"
+        ? current.filter((article) => !belongsToOperation(article))
+        : current.map((article) => belongsToOperation(article) ? { ...article, isRead: true } : article));
+      setFeedUnreadCounts((current) => ({ ...current, [feedId]: 0 }));
+      setReadingListUnreadCount((current) => Math.max(0, current - (feedUnreadCounts[feedId] ?? 0)));
+      if (targetMode === "all") setContinuation(oldContinuation);
+      else {
+        beginReadingSession(targetScope, targetMode, true);
+        setListRefreshKey((key) => key + 1);
+      }
+
+      const unreadSequence = ++unreadRefreshSequenceRef.current;
+      const mutationVersion = unreadMutationVersionRef.current;
+      unreadRefreshRequestedAtRef.current = Date.now();
+      const [pageResult, unreadResult] = await Promise.allSettled([
+        targetMode === "unread" ? rssClient.getStream({ streamId: getStreamId(targetScope), unreadOnly: true }) : Promise.resolve(null),
+        rssClient.refreshUnreadCounts(),
+      ]);
+      if (listSequence !== requestSequenceRef.current) return;
+      const countsFresh = unreadResult.status === "fulfilled"
+        && unreadSequence === unreadRefreshSequenceRef.current && mutationVersion === unreadMutationVersionRef.current;
+      if (countsFresh) {
+        setReadingListUnreadCount(unreadResult.value.readingListUnreadCount);
+        setFeedUnreadCounts(unreadResult.value.feedUnreadCounts);
+      }
+      const pageFresh = targetMode === "all" || (pageResult.status === "fulfilled" && pageResult.value && !pageResult.value.fromCache);
+      if (targetMode === "unread" && pageResult.status === "fulfilled" && pageResult.value && !pageResult.value.fromCache) {
+        setArticles(pageResult.value.items);
+        setContinuation(pageResult.value.continuation);
+        setSelectedId(pageResult.value.items[0]?.id ?? null);
+        beginReadingSession(targetScope, targetMode, true);
+        setListRefreshKey((key) => key + 1);
+      }
+      notify(pageFresh && countsFresh ? "该 Feed 已全部标记为已读" : "该 Feed 已标记为已读，但列表或未读数量刷新失败，请稍后刷新");
+    } catch (error) {
+      if (listSequence === requestSequenceRef.current) {
+        setContinuation(oldContinuation);
+        notify(normalizeRssError(error).message);
+      }
+      throw error;
+    } finally {
+      if (listSequence === requestSequenceRef.current) setLoadingList(false);
+    }
+  }, [scope, mode, previewMode, continuation, articles, feedUnreadCounts, applyPreviewScope, beginReadingSession, recordFeedsMarkedRead, reconcileUnreadCounts, rssClient, notify]);
+
   /**
    * Submit final article states and use a separate operation sequence for each field to handle
    * out-of-order responses.
@@ -1611,6 +1708,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
                 onRefreshList={refreshCurrentList}
                 onMarkAllRead={markCurrentListRead}
                 onMarkAboveRead={markArticlesAboveRead}
+                onMarkFeedRead={markFeedRead}
                 onOpenSidebar={openSidebar}
                 onOpenArticle={openArticle}
                 onOpenExternal={openExternal}

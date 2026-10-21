@@ -9,6 +9,8 @@ type Props = {
   article: Article;
   feedIconUrl?: string;
   active: boolean;
+  contextMenuActive: boolean;
+  onContextMenu: (x: number, y: number) => void;
   shortcutNumber?: number;
   highlightPhase: "idle" | "reading" | "holding" | "releasing";
   onHighlightEnd: () => void;
@@ -26,11 +28,12 @@ type Props = {
  * Render one article while separating feed navigation and state actions from opening the card.
  * 渲染单篇文章，并把来源跳转和状态操作与卡片打开动作隔离。
  */
-export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
+export function ArticleCard({ listNow, article, feedIconUrl, active, contextMenuActive, onContextMenu, shortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
   const [sourceNotice, setSourceNotice] = useState("");
   const [sourceNoticeVisible, setSourceNoticeVisible] = useState(false);
   const [titleFitsOneLine, setTitleFitsOneLine] = useState(false);
   const titleMeasureRef = useRef<HTMLHeadingElement>(null);
+  const lastPointerTypeRef = useRef("mouse");
   const sourceNoticeHideTimerRef = useRef<number | null>(null);
   const sourceNoticeClearTimerRef = useRef<number | null>(null);
   const hasSummary = article.summaryText.trim().length > 0;
@@ -121,7 +124,16 @@ export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNum
 
   return (
     <article
-      className={`article-card ${layout.heightClass} ${article.isRead ? "read" : ""} ${highlightPhase !== "idle" ? `reading-highlight highlight-${highlightPhase}` : ""}`}
+      className={`article-card ${layout.heightClass} ${article.isRead ? "read" : ""} ${contextMenuActive ? "context-menu-active" : ""} ${highlightPhase !== "idle" ? `reading-highlight highlight-${highlightPhase}` : ""}`}
+      onPointerDown={(event) => { lastPointerTypeRef.current = event.pointerType; }}
+      onContextMenu={(event) => {
+        if (!active) return;
+        event.preventDefault();
+        event.stopPropagation();
+        // Native touch contextmenu must not bypass the pager's 500ms/6px recognition.
+        if (lastPointerTypeRef.current !== "mouse") return;
+        onContextMenu(event.clientX, event.clientY);
+      }}
       onTransitionEnd={(event) => {
         if (event.target === event.currentTarget && event.propertyName === "background-color"
           && !event.nativeEvent.pseudoElement) onHighlightEnd();
