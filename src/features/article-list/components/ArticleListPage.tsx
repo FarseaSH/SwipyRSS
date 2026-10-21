@@ -1106,7 +1106,14 @@ export function ArticleListPage(props: Props) {
                   feedLinkEnabled={Boolean(props.selectedFolder || props.selectedFeed)}
                   isCurrentFeed={props.selectedFeed?.id === article.feedId}
                   suppressClick={() => suppressClickRef.current}
-                  onOpen={() => {
+                  onOpen={(openOriginal) => {
+                    if (openOriginal && article.articleUrl) {
+                      // Open during the click to retain the browser's popup permission.
+                      // 在点击回调中直接打开，保留浏览器的弹窗权限。
+                      props.onOpenExternal(article.articleUrl);
+                      props.onMarkRead([article.id]);
+                      return;
+                    }
                     setReturnSelection(null);
                     setHighlightCue(null);
                     props.onOpenArticle(article.id);

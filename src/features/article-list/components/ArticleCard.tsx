@@ -14,7 +14,7 @@ type Props = {
   onHighlightEnd: () => void;
   feedLinkEnabled: boolean;
   isCurrentFeed: boolean;
-  onOpen: () => void;
+  onOpen: (openOriginal: boolean) => void;
   onSelectFeed: () => void;
   onToggleRead: () => void;
   onToggleStar: () => void;
@@ -42,7 +42,7 @@ export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNum
     heightClass: getHeightClass(titleFitsOneLine),
     titleFitsOneLine,
   };
-  const open = () => { if (!suppressClick()) onOpen(); };
+  const open = (openOriginal = false) => { if (!suppressClick()) onOpen(openOriginal); };
 
   useEffect(() => () => {
     window.clearTimeout(sourceNoticeHideTimerRef.current ?? undefined);
@@ -132,7 +132,7 @@ export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNum
       aria-hidden={!active}
       aria-label={`打开文章：${article.title}`}
       inert={!active}
-      onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(); }}
+      onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(event.ctrlKey || event.metaKey); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
     >
       <ArticleCardVisual
