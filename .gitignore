@@ -46,3 +46,5 @@ Desktop.ini
 
 src-tauri
 freshrss-extension
+# Local development and browser verification artifacts
+/work/

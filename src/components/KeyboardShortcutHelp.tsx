@@ -56,7 +56,7 @@ export function KeyboardShortcutHelp({ view, mode, swipeMarkReadMode, disabled, 
         else if (event.target !== closeRef.current) event.preventDefault();
         return;
       }
-      if (disabled) return;
+      if (disabled || document.querySelector(".article-context-menu, .feed-read-confirm")) return;
       if (event.key !== triggerKey) dismiss();
       if (event.defaultPrevented || event.isComposing || event.repeat) return;
       if (event.key === "," && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
