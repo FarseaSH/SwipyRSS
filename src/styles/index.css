@@ -189,7 +189,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 /* Match the source icon's left edge: card padding + action column + column gap - divider inset - label gap. */
 .article-divider:not(:empty)::before { flex: 0 0 18px; }
 .article-divider:empty { gap: 0; }
-.article-time-section { flex: none; color: var(--color-line); font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
+.article-time-section { flex: none; color: var(--article-meta-color); font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
 .article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider,
 .article-card:is(.selected,.touch-pressed,.reading-highlight) + .article-card > .article-divider,
 .article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { opacity: 0; }
