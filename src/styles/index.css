@@ -47,7 +47,10 @@ html { background: var(--color-canvas); -webkit-font-smoothing: antialiased; }
 body { margin: 0; overscroll-behavior: none; background: var(--color-canvas); color: var(--color-ink); font-family: Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; }
-button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-accent-500); outline-offset: 2px; }
+/* Keep focus and keyboard navigation without framing entire pages or scroll regions.
+ * Text-entry controls retain their own native or custom focus indicators. */
+:focus:not(:is(input, textarea, select, [contenteditable]:not([contenteditable="false"]))) { outline: none; }
+:is(.article-card, .icon-button, .sidebar-item, .sidebar-folder-link, .sidebar-folder-toggle, .reader-tool, .floating-switch-option):focus-visible { background-color: var(--color-selected); }
 .app-header { background: rgba(252,252,253,.92); }
 .article-loading-overlay { background: rgba(252,252,253,.78); }
 
@@ -348,7 +351,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-edge-control.previous::before { background: linear-gradient(to bottom, rgba(252,252,253,.84) 0%, rgba(252,252,253,.58) 35%, rgba(252,252,253,.22) 70%, rgba(252,252,253,0) 100%); }
 .article-edge-control.previous::after { mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.68) 35%, rgba(0,0,0,.24) 70%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.68) 35%, rgba(0,0,0,.24) 70%, transparent 100%); }
 .article-edge-control:disabled { cursor: default; }
-.article-edge-control:focus-visible { outline: 2px solid var(--color-accent-600); outline-offset: -2px; }
+.article-edge-control:focus-visible { background-color: var(--color-selected); }
 .article-viewport.is-paging .article-edge-control { pointer-events: none; }
 .article-end { position: relative; display: flex; width: 100%; height: 64px; flex: 0 0 64px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; padding: 8px 18px; background: transparent; color: var(--color-muted); text-align: center; cursor: pointer; transition: color 160ms ease, background-color 160ms ease, transform 160ms ease; }
 .article-end-title { font-size: 11px; font-weight: 500; line-height: 16px; letter-spacing: .08em; }
@@ -501,7 +504,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .reader-star-tool:active .reader-star-icon { transform: scale(.95); }
 .reader-star-tool.starred .reader-star-icon { color: #b9780e; }
 .reader-star-tool.starred .reader-star-icon::before { background: #fff3cf; }
-.floating-switch-option:focus-visible, .reader-tool:focus-visible { outline-offset: -3px; }
 
 @media (min-width: 1024px) {
   .sidebar-close-button { display: none; }
