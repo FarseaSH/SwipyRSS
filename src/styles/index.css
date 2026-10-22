@@ -184,7 +184,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-card.title-only { height: 92px; flex-basis: 92px; }
 .article-card.standard { height: 104px; flex-basis: 104px; }
 /* Labels live on the existing boundary without changing any card's fixed height. */
-.article-divider { position: absolute; top: -8px; right: 16px; left: 16px; z-index: 2; display: flex; height: 16px; align-items: center; gap: 8px; pointer-events: none; }
+.article-divider { position: absolute; top: -8px; right: 16px; left: 16px; z-index: 2; display: flex; height: 16px; align-items: center; gap: 8px; opacity: 1; pointer-events: none; transition: opacity var(--article-divider-fade-in,180ms) ease-out; }
 .article-divider::before, .article-divider::after { height: 1px; flex: 1; background: var(--color-line); content: ""; }
 /* Match the source icon's left edge: card padding + action column + column gap - divider inset - label gap. */
 .article-divider:not(:empty)::before { flex: 0 0 18px; }
@@ -192,7 +192,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-time-section { flex: none; color: #6a7485; font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
 .article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider,
 .article-card:is(.selected,.touch-pressed,.reading-highlight) + .article-card > .article-divider,
-.article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { opacity: 0; }
+.article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { opacity: 0; transition-duration: var(--article-divider-fade-out,120ms); }
 .article-card.selected { border-color: var(--color-border-selected); background: var(--color-selected); box-shadow: none; }
 .article-card.touch-pressed:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; transition-duration: 60ms; }
 /*
@@ -204,15 +204,16 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-card.highlight-releasing { border-color: transparent; background: transparent; transition: border-color 180ms ease, background-color 180ms ease; }
 .article-card.highlight-releasing > .article-divider,
 .article-card.highlight-releasing + .article-card > .article-divider,
-.article-group:has(> .article-card:last-child.highlight-releasing) + .article-group > .article-card:first-child > .article-divider { opacity: 1; }
+.article-group:has(> .article-card:last-child.highlight-releasing) + .article-group > .article-card:first-child > .article-divider { opacity: 1; transition-duration: var(--article-divider-fade-in,180ms); }
 /*
  * Highlight protection controls card feedback only; buttons and links remain immediately usable.
  * 高亮保护只控制卡片反馈，按钮和链接仍可立即操作。
  */
 .article-hover-locked .article-card.touch-pressed:not(.reading-highlight) { border-color: transparent; background: transparent; }
 .article-hover-locked .article-card.touch-pressed:not(.reading-highlight) > .article-divider,
-.article-hover-locked .article-card.touch-pressed:not(.reading-highlight) + .article-card:not(.reading-highlight) > .article-divider { opacity: 1; }
+.article-hover-locked .article-card.touch-pressed:not(.reading-highlight) + .article-card:not(.reading-highlight) > .article-divider { opacity: 1; transition-duration: var(--article-divider-fade-in,180ms); }
 @media (prefers-reduced-motion: reduce) {
+  .article-divider { --article-divider-fade-in: 0ms; --article-divider-fade-out: 0ms; }
   .article-card.highlight-releasing { transition-duration: 1ms; }
 }
 .article-card.read { --article-summary-color: var(--color-read-copy); --article-meta-color: var(--color-read-muted); --article-source-icon-opacity: .58; }
@@ -277,7 +278,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
   .reader-star-tool.starred:hover .reader-star-icon { color: #b9780e; }
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover > .article-divider,
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover + .article-card > .article-divider,
-  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { opacity: 0; }
+  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { opacity: 0; transition-duration: var(--article-divider-fade-out,120ms); }
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover { background: transparent; color: var(--color-accent-600); }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover .read-state-ring { stroke: var(--color-accent-600); }
