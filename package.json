@@ -9,7 +9,8 @@
     "build": "npm run build:web",
     "build:web": "tsc -b && vite build --mode web",
     "preview": "vite preview --mode web",
-    "test:platform": "node --test scripts/tests/platform.test.mjs"
+    "test:platform": "node --test scripts/tests/platform.test.mjs",
+    "test:settings-backup": "node --test scripts/tests/settings-backup.test.mjs"
   },
   "dependencies": {
     "dompurify": "^3.2.6",

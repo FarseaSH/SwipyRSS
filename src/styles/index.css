@@ -679,3 +679,42 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 [data-touch-feedback-suppressed] :is(button,a):active {
   transform: none;
 }
+
+/* Settings backup modal: native dialog traps focus and makes the background inert.
+ * 设置备份模态窗口：原生 dialog 限制焦点并使背景不可交互。 */
+.backup-dialog { position: fixed; inset: var(--backup-viewport-top,0px) 0 auto; width: 100%; max-width: none; height: var(--backup-viewport-height,100dvh); max-height: none; margin: 0; border: 0; padding: max(12px,env(safe-area-inset-top)) 16px max(12px,env(safe-area-inset-bottom)); background: transparent; color: var(--color-ink); }
+.backup-dialog[open] { display: grid; place-items: center; }
+.backup-dialog::backdrop { background: rgba(14,24,38,.32); backdrop-filter: blur(4px); }
+.backup-card { display: flex; flex-direction: column; width: min(700px,100%); max-height: min(85dvh,100%); min-height: 0; overflow: hidden; border: 1px solid var(--color-line); border-radius: 22px; padding: 22px; background: var(--color-panel); box-shadow: var(--shadow-float); }
+.backup-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.backup-header { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; }
+.backup-header > div { display: flex; align-items: center; gap: 10px; }
+.backup-header h2 { margin: 0; font-size: 18px; }
+.backup-description { flex: none; margin: 10px 0 18px; color: var(--color-muted); font-size: 13px; line-height: 1.65; }
+.backup-tabs { display: flex; flex: none; gap: 4px; padding: 4px; border-radius: 12px; background: var(--color-control); }
+.backup-tabs button { flex: 1; min-height: 40px; border: 0; border-radius: 9px; padding: 8px; background: transparent; color: var(--color-muted); font-size: 13px; font-weight: 650; cursor: pointer; }
+.backup-tabs button[aria-selected="true"] { background: var(--color-panel); color: var(--color-accent-700); box-shadow: 0 2px 7px rgba(31,49,72,.08); }
+.backup-panel { display: flex; flex-direction: column; min-height: 100px; margin-top: 18px; }
+.backup-panel label { flex: none; margin-bottom: 8px; color: var(--color-copy); font-size: 12px; font-weight: 650; }
+.backup-panel textarea { width: 100%; height: clamp(120px,32dvh,340px); min-height: 64px; flex: 1 1 auto; resize: none; border: 1px solid var(--color-line); border-radius: 12px; padding: 14px; background: #f8fafc; color: var(--color-copy); font: 13px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; outline: none; overflow: auto; }
+.backup-panel textarea:focus { border-color: var(--color-accent-500); box-shadow: 0 0 0 2px var(--color-accent-50); }
+.backup-panel textarea[aria-invalid="true"] { border-color: #b44444; }
+.backup-hint { flex: none; margin: 8px 0 0; color: var(--color-muted); font-size: 11px; line-height: 1.6; }
+.backup-confirm { flex: none; border: 1px solid var(--color-border-selected); border-radius: 12px; margin-top: 14px; padding: 12px 14px; background: var(--color-accent-50); color: var(--color-accent-700); font-size: 12px; line-height: 1.6; }
+.backup-confirm p { margin: 5px 0 0; }
+.backup-feedback { display: flex; flex: none; align-items: flex-start; gap: 6px; margin: 12px 0 0; color: var(--color-copy); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.backup-feedback svg { flex: none; margin-top: 2px; }
+.backup-feedback.error { color: #b44444; }
+.backup-feedback.success { color: #39724c; }
+.backup-actions { display: flex; flex: none; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.backup-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-size: 13px; }
+.backup-actions .connection-primary-button { flex: none; min-width: 128px; }
+.backup-actions button:disabled { opacity: .45; cursor: default; }
+.backup-entry-header { margin-bottom: 0; border-bottom: 0; padding-bottom: 0; }
+@media (max-width: 480px) {
+  .backup-dialog { padding-right: 10px; padding-left: 10px; }
+  .backup-card { max-height: 100%; border-radius: 18px; padding: 16px; }
+  .backup-panel textarea { font-size: 16px; }
+  .backup-actions button { flex: 1; padding-right: 12px; padding-left: 12px; }
+  .backup-actions .connection-primary-button { flex: 1; min-width: 0; }
+}

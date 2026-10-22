@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, Keyboard, Menu, Settings } from "lucide-react";
+import { CheckCircle2, Eye, FileJson, Keyboard, Menu, Settings } from "lucide-react";
 import { FreshRssConnectionForm } from "@/features/connection/components/FreshRssConnectionForm";
 import { useMemo } from "react";
 import type { ConnectionDefaults } from "@/platform/Platform";
@@ -19,6 +19,7 @@ type Props = {
   onCancel: () => void;
   onOpenSidebar: () => void;
   onOpenShortcutHelp: () => void;
+  onOpenSettingsBackup: () => void;
   onSave: (connection: FreshRssConnectionInput) => Promise<void>;
 };
 
@@ -26,7 +27,7 @@ type Props = {
  * Display application settings and ensure saved API passwords are never returned to React.
  * 展示应用设置，并保证已保存的 API 密码不会重新回传给 React。
  */
-export function SettingsPage({ connectionDefaults, connection, configured, startupPageMode, onStartupPageModeChange, toolbarPosition, onToolbarPositionChange, swipeMarkReadMode, onSwipeMarkReadModeChange, onCancel, onOpenSidebar, onOpenShortcutHelp, onSave }: Props) {
+export function SettingsPage({ connectionDefaults, connection, configured, startupPageMode, onStartupPageModeChange, toolbarPosition, onToolbarPositionChange, swipeMarkReadMode, onSwipeMarkReadModeChange, onCancel, onOpenSidebar, onOpenShortcutHelp, onOpenSettingsBackup, onSave }: Props) {
   const initialValue = useMemo<FreshRssConnectionInput>(() => ({
     apiUrl: connection?.apiUrl ?? connectionDefaults.apiUrl,
     username: connection?.username ?? connectionDefaults.username,
@@ -85,6 +86,12 @@ export function SettingsPage({ connectionDefaults, connection, configured, start
             <div className="settings-card-header">
               <div><h3 id="shortcut-settings-title">快捷键</h3><p>查看列表与正文的键盘操作，也可长按 Ctrl 或 ⌘ 查看当前页面的快捷键。</p></div>
               <button type="button" className="shortcut-help-entry" onClick={onOpenShortcutHelp}><Keyboard size={18}/>快捷键帮助</button>
+            </div>
+          </section>
+          <section className="settings-card" aria-labelledby="settings-backup-card-title">
+            <div className="settings-card-header backup-entry-header">
+              <div><h3 id="settings-backup-card-title">数据与备份</h3><p>通过文本备份或迁移应用设置与 Feed 阅读模式。</p></div>
+              <button type="button" className="shortcut-help-entry" onClick={onOpenSettingsBackup}><FileJson size={18}/>导入 / 导出设置</button>
             </div>
           </section>
         </div>
