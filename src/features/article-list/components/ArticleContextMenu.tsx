@@ -75,12 +75,11 @@ export function ArticleContextMenu(props: Props) {
         } else if (event.key === "Tab") { event.preventDefault(); props.onClose(); }
       }}>
       <button role="menuitem" onClick={() => run(props.onStar)}><Star size={17} fill={props.article.isStarred ? "currentColor" : "none"} className={props.article.isStarred ? "starred" : undefined}/><span>{props.article.isStarred ? "取消收藏" : "收藏该文章"}</span></button>
-      <button role="menuitem" disabled={!props.canMarkAbove} title={props.canMarkAbove ? undefined : "该条及上方没有未读文章"} onClick={() => run(props.onMarkAbove)}><ArrowUpToLine size={17}/><span>标记该条及上方文章为已读</span></button>
+      <button role="menuitem" disabled={!props.canMarkAbove} title={props.canMarkAbove ? undefined : "该条及上方没有未读文章"} onClick={() => run(props.onMarkAbove)}><ArrowUpToLine size={17}/><span>上方已读</span></button>
       {props.mixed ? <>
         <div className="article-context-separator" role="separator"/>
         <div className="article-context-feed" title={feedName}><FeedIcon iconUrl={props.feed?.iconUrl}/><span>{feedName}</span></div>
-        <div className="article-context-separator" role="separator"/>
-        <button role="menuitem" onClick={() => run(props.onMarkFeed)}><CheckCheck size={17}/><span>标记该 Feed 全部已读</span></button>
+        <button role="menuitem" onClick={() => run(props.onMarkFeed)}><CheckCheck size={17}/><span>全部Feed已读</span></button>
         <button role="menuitem" onClick={() => run(props.onSelectFeed)}><ArrowRight size={17}/><span>前往该 Feed</span></button>
       </> : null}
     </div>, document.body,
