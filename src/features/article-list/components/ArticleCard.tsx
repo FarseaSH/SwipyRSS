@@ -6,6 +6,7 @@ import { ArticleCardVisual, ArticleSourceIcon, ArticleSourceLabel } from "./Arti
 
 type Props = {
   listNow: number;
+  timeSectionLabel?: string;
   article: Article;
   feedIconUrl?: string;
   active: boolean;
@@ -26,7 +27,7 @@ type Props = {
  * Render one article while separating feed navigation and state actions from opening the card.
  * 渲染单篇文章，并把来源跳转和状态操作与卡片打开动作隔离。
  */
-export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
+export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, active, shortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
   const [sourceNotice, setSourceNotice] = useState("");
   const [sourceNoticeVisible, setSourceNoticeVisible] = useState(false);
   const [titleFitsOneLine, setTitleFitsOneLine] = useState(false);
@@ -135,6 +136,7 @@ export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNum
       onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
     >
+      <span className="article-divider" aria-hidden="true">{timeSectionLabel ? <span className="article-time-section">{timeSectionLabel}</span> : null}</span>
       <ArticleCardVisual
         listNow={listNow}
         article={article}

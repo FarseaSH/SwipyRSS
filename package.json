@@ -4,12 +4,13 @@
   "version": "0.1.3",
   "type": "module",
   "scripts": {
-    "dev": "npm run dev:web",
+    "dev": "vite --mode web",
     "dev:web": "vite --mode web",
     "build": "npm run build:web",
     "build:web": "tsc -b && vite build --mode web",
     "preview": "vite preview --mode web",
-    "test:platform": "node --test scripts/tests/platform.test.mjs"
+    "test:platform": "node --test scripts/tests/platform.test.mjs",
+    "test:time-sections": "node --test scripts/tests/timeSections.test.mjs"
   },
   "dependencies": {
     "dompurify": "^3.2.6",
