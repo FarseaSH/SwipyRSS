@@ -42,6 +42,9 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
   const pendingSelectionRef = useRef(false);
   const initializedFoldersRef = useRef(folders.length > 0);
   const positioningFrameRef = useRef(0);
+  const readySelectionRef = useRef<string | null>(null);
+  const previousOpenRef = useRef(open);
+  const exclusiveFolderRef = useRef<string | null>(null);
 
   // Only a changed selection (or its first arrival with async data) requests placement.
   // Counts, manual expansion and reopening the drawer must preserve the user's position.
@@ -58,36 +61,76 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
       cancelAnimationFrame(positioningFrameRef.current);
       lastSelectionRef.current = selectionKey;
       pendingSelectionRef.current = Boolean(folder);
-      if (folder) setExpandedFolderIds((current) => current.has(folder.id) ? current : new Set([folder.id]));
+      readySelectionRef.current = null;
     }
   }, [selectionKey, folders, selectedFolderId, selectedFeedId]);
 
   useLayoutEffect(() => {
+    const reopening = open && !previousOpenRef.current;
+    previousOpenRef.current = open;
     if (!pendingSelectionRef.current) return;
     const area = scrollAreaRef.current;
-    if (!area) return;
-    const group = Array.from(area.querySelectorAll<HTMLElement>("[data-folder-id]")).find((element) =>
-      selectedFeedId
-        ? Array.from(element.querySelectorAll<HTMLElement>("[data-feed-id]")).some((feed) => feed.dataset.feedId === selectedFeedId)
-        : element.dataset.folderId === selectedFolderId);
-    if (!group || !expandedFolderIds.has(group.dataset.folderId!)) return;
-    pendingSelectionRef.current = false;
-    const started = performance.now();
-    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260;
-    const place = () => {
-      const row = group.querySelector<HTMLElement>(".sidebar-folder-row")!;
-      const viewport = group.querySelector<HTMLElement>(".sidebar-feed-viewport");
-      const activeFeed = Array.from(group.querySelectorAll<HTMLElement>("[data-feed-id]")).find((feed) => feed.dataset.feedId === selectedFeedId);
-      if (viewport && activeFeed) {
-        viewport.scrollTop = secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight);
+    const drawer = drawerRef.current;
+    if (!area || !drawer) return;
+    const mobile = !window.matchMedia("(min-width: 1024px)").matches;
+    let cancelled = false;
+
+    const position = () => {
+      if (cancelled || !pendingSelectionRef.current) return;
+      const folder = selectedFeedId
+        ? folders.find((candidate) => candidate.id === selectedFolderId && candidate.feedIds.includes(selectedFeedId))
+          ?? folders.find((candidate) => candidate.feedIds.includes(selectedFeedId))
+        : folders.find((candidate) => candidate.id === selectedFolderId);
+      if (!folder) return;
+      readySelectionRef.current = selectionKey;
+      // Defer tree expansion/collapse too: changing its height while the drawer closes
+      // would still make the visible rows jump, even with scroll placement deferred.
+      const exclusive = exclusiveFolderRef.current;
+      exclusiveFolderRef.current = null;
+      if (!expandedFolderIds.has(folder.id) || (exclusive && (expandedFolderIds.size !== 1 || !expandedFolderIds.has(exclusive)))) {
+        setExpandedFolderIds(new Set([exclusive ?? folder.id]));
+        return;
       }
-      area.scrollTop = secondRowScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
-      // Track the changing content boundary while folders expand/collapse, including on mobile
-      // while the drawer is offscreen. Never replay this on the next drawer-open event.
-      if (performance.now() - started < duration) positioningFrameRef.current = requestAnimationFrame(place);
+      const group = Array.from(area.querySelectorAll<HTMLElement>("[data-folder-id]")).find((element) => element.dataset.folderId === folder.id);
+      if (!group) return;
+      pendingSelectionRef.current = false;
+      if (mobile) {
+        // Hidden placement is immediate. Also settle before the first paint if a quick
+        // reopen interrupted closing, so there is no visible replay of the scroll.
+        for (const animation of area.getAnimations({ subtree: true })) {
+          const target = (animation.effect as KeyframeEffect | null)?.target;
+          if (target instanceof Element && target.matches(".sidebar-feed-collapse, .sidebar-feed-list")) animation.finish();
+        }
+      }
+      const started = performance.now();
+      const duration = mobile || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260;
+      const place = () => {
+        if (cancelled) return;
+        const row = group.querySelector<HTMLElement>(".sidebar-folder-row")!;
+        const viewport = group.querySelector<HTMLElement>(".sidebar-feed-viewport");
+        const activeFeed = Array.from(group.querySelectorAll<HTMLElement>("[data-feed-id]")).find((feed) => feed.dataset.feedId === selectedFeedId);
+        if (viewport && activeFeed) {
+          viewport.scrollTop = secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight);
+        }
+        area.scrollTop = secondRowScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
+        if (performance.now() - started < duration) positioningFrameRef.current = requestAnimationFrame(place);
+      };
+      place();
     };
-    place();
-  }, [selectionKey, expandedFolderIds, folders, feeds, selectedFolderId, selectedFeedId]);
+
+    if (mobile && readySelectionRef.current !== selectionKey) {
+      if (open && !reopening) return;
+      // getAnimations forces style resolution and observes the actual drawer transition,
+      // including zero-duration/reduced-motion cases, rather than guessing a timeout.
+      const closing = open ? [] : drawer.getAnimations().filter((animation) => animation.playState !== "finished");
+      if (closing.length) {
+        void Promise.allSettled(closing.map((animation) => animation.finished)).then(() => {
+          if (!cancelled) position();
+        });
+      } else position();
+    } else position();
+    return () => { cancelled = true; cancelAnimationFrame(positioningFrameRef.current); };
+  }, [open, selectionKey, expandedFolderIds, folders, feeds, selectedFolderId, selectedFeedId, drawerRef]);
 
   useLayoutEffect(() => {
     const area = scrollAreaRef.current;
@@ -106,7 +149,13 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
   const openSettings = () => { onOpenSettings(); onClose(); };
   const select = (next: ArticleMode) => { onSelectMode(next); onClose(); };
   const selectStarred = () => { onSelectStarred(); onClose(); };
-  const selectFolder = (folderId: string) => { setExpandedFolderIds(new Set([folderId])); onSelectFolder(folderId); onClose(); };
+  const selectFolder = (folderId: string) => {
+    exclusiveFolderRef.current = folderId;
+    pendingSelectionRef.current = true;
+    readySelectionRef.current = null;
+    onSelectFolder(folderId);
+    onClose();
+  };
   const selectFeed = (feedId: string) => {
     onSelectFeed(feedId);
     onClose();
