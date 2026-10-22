@@ -383,6 +383,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const previewArticlesRef = useRef(
     new Map(initialArticles.map((article) => [article.id, { ...article }])),
   );
+  // Keep the preview cursor stable when articles are marked read before loading the next batch.
+  const previewListArticlesRef = useRef<Article[]>([]);
   const feedReadActivityStorageKey = useMemo(
     () => getFeedReadActivityStorageKey(connection, previewMode),
     [connection, previewMode],
@@ -654,6 +656,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     const visibleArticles = previewArticles
       .filter((article) => articleMatchesPreviewScope(article, nextScope, previewFolders))
       .filter((article) => nextMode === "all" || !article.isRead);
+    previewListArticlesRef.current = visibleArticles;
     const page = getPreviewArticlePage(visibleArticles);
     replaceArticleList(page.items);
     setContinuation(page.continuation);
@@ -789,6 +792,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     const visibleArticles = previewArticles
       .filter((article) => articleMatchesPreviewScope(article, startupScope, previewFolders))
       .filter((article) => restoredMode === "all" || !article.isRead);
+    previewListArticlesRef.current = visibleArticles;
     const page = getPreviewArticlePage(visibleArticles);
     replaceArticleList(page.items);
     setSelectedId(page.items[0]?.id ?? null);
@@ -862,7 +866,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
 
     void restore();
     return () => { cancelled = true; };
-  }, [beginReadingSession, enterPreview, notify, platform, rssClient]);
+  }, [beginReadingSession, enterPreview, notify, platform, rssClient, replaceArticleList]);
 
   /**
    * Reconcile sidebar counts with FreshRSS's unread-count endpoint. Read-state writes during the
@@ -1422,9 +1426,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     try {
       const page = previewMode
         ? getPreviewArticlePage(
-          Array.from(previewArticlesRef.current.values())
-            .filter((article) => articleMatchesPreviewScope(article, scope, previewFolders))
-            .filter((article) => mode === "all" || !article.isRead),
+          previewListArticlesRef.current.map((article) => previewArticlesRef.current.get(article.id) ?? article),
           requestedContinuation,
         )
         : await rssClient.getStream({
