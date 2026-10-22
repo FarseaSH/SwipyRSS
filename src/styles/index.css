@@ -185,11 +185,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-card.standard { height: 104px; flex-basis: 104px; }
 /* Labels live on the existing boundary without changing any card's fixed height. */
 .article-divider { position: absolute; top: -8px; right: 16px; left: 16px; z-index: 2; display: flex; height: 16px; align-items: center; gap: 8px; opacity: 1; pointer-events: none; transition: opacity var(--article-divider-fade-in,180ms) ease-out; }
-.article-divider::before, .article-divider::after { height: 1px; flex: 1; background: var(--color-line); content: ""; }
+.article-divider::before, .article-divider::after { height: 1px; flex: 1; background: var(--color-line); opacity: var(--article-divider-line-opacity,1); content: ""; }
 /* Match the source icon's left edge: card padding + action column + column gap - divider inset - label gap. */
 .article-divider:not(:empty)::before { flex: 0 0 18px; }
 .article-divider:empty { gap: 0; }
-.article-time-section { flex: none; color: #6a7485; font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
+.article-time-section { flex: none; color: #6a7485; font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; opacity: var(--article-divider-label-opacity,1); }
+/* Hover keeps a faint time label while the two line segments fade away. */
+.article-divider::before, .article-divider::after, .article-time-section { transition: opacity var(--article-divider-content-duration,var(--article-divider-fade-in,180ms)) ease-out; }
 .article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider,
 .article-card:is(.selected,.touch-pressed,.reading-highlight) + .article-card > .article-divider,
 .article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { opacity: 0; transition-duration: var(--article-divider-fade-out,120ms); }
@@ -278,7 +280,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
   .reader-star-tool.starred:hover .reader-star-icon { color: #b9780e; }
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover > .article-divider,
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover + .article-card > .article-divider,
-  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { opacity: 0; transition-duration: var(--article-divider-fade-out,120ms); }
+  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 0; --article-divider-label-opacity: .25; --article-divider-content-duration: var(--article-divider-fade-out,120ms); }
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover { background: transparent; color: var(--color-accent-600); }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover .read-state-ring { stroke: var(--color-accent-600); }
