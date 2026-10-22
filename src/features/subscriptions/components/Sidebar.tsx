@@ -62,6 +62,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
       lastSelectionRef.current = selectionKey;
       pendingSelectionRef.current = Boolean(folder);
       readySelectionRef.current = null;
+      if (!folder || selectedFeedId) exclusiveFolderRef.current = null;
     }
   }, [selectionKey, folders, selectedFolderId, selectedFeedId]);
 
@@ -134,7 +135,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
 
   useLayoutEffect(() => {
     const area = scrollAreaRef.current;
-    const cancel = () => { cancelAnimationFrame(positioningFrameRef.current); pendingSelectionRef.current = false; };
+    const cancel = () => { cancelAnimationFrame(positioningFrameRef.current); pendingSelectionRef.current = false; exclusiveFolderRef.current = null; };
     area?.addEventListener("wheel", cancel, { passive: true });
     area?.addEventListener("pointerdown", cancel, true);
     area?.addEventListener("keydown", cancel, true);
@@ -153,6 +154,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
     exclusiveFolderRef.current = folderId;
     pendingSelectionRef.current = true;
     readySelectionRef.current = null;
+    if (window.matchMedia("(min-width: 1024px)").matches) setExpandedFolderIds(new Set([folderId]));
     onSelectFolder(folderId);
     onClose();
   };
