@@ -189,12 +189,30 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 /* Match the source icon's left edge: card padding + action column + column gap - divider inset - label gap. */
 .article-divider:not(:empty)::before { flex: 0 0 18px; }
 .article-divider:empty { gap: 0; }
-.article-time-section { flex: none; color: #6a7485; font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; opacity: var(--article-divider-label-opacity,1); }
+.article-time-section { position: relative; isolation: isolate; flex: none; color: #6a7485; font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
+/* Keep the border gap opaque independently of text opacity. Each half follows the card on its
+ * side of the boundary, including when the highlighted card is above the label. */
+.article-time-section::before, .article-time-section::after { position: absolute; z-index: -1; right: -8px; left: -8px; height: 50%; content: ""; transition: background-color var(--article-divider-cover-duration,var(--article-divider-fade-in,180ms)) ease; }
+.article-time-section::before { top: 0; background-color: var(--article-divider-above-background,var(--color-canvas)); }
+.article-time-section::after { bottom: 0; background-color: var(--article-divider-below-background,var(--color-canvas)); }
+.article-time-section-text { opacity: var(--article-divider-label-opacity,1); }
 /* Hover and return highlighting keep a faint time label while the two line segments fade away. */
-.article-divider::before, .article-divider::after, .article-time-section { transition: opacity var(--article-divider-content-duration,var(--article-divider-fade-in,180ms)) ease-out; }
+.article-divider::before, .article-divider::after, .article-time-section-text { transition: opacity var(--article-divider-content-duration,var(--article-divider-fade-in,180ms)) ease-out; }
 .article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider,
 .article-card:is(.selected,.touch-pressed,.reading-highlight) + .article-card > .article-divider,
 .article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 0; --article-divider-label-opacity: .25; --article-divider-content-duration: var(--article-divider-fade-out,120ms); }
+.article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider { --article-divider-below-background: var(--color-hover); }
+.article-card:is(.selected,.touch-pressed,.reading-highlight) + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-hover); }
+.article-card.selected > .article-divider { --article-divider-below-background: var(--color-selected); }
+.article-card.selected + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child.selected) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-selected); }
+.article-card.touch-pressed > .article-divider,
+.article-card.touch-pressed + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child.touch-pressed) + .article-group > .article-card:first-child > .article-divider { --article-divider-cover-duration: 60ms; }
+.article-card.reading-highlight:not(.highlight-releasing) > .article-divider,
+.article-card.reading-highlight:not(.highlight-releasing) + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child.reading-highlight:not(.highlight-releasing)) + .article-group > .article-card:first-child > .article-divider { --article-divider-cover-duration: 0ms; }
 .article-card.selected { border-color: var(--color-border-selected); background: var(--color-selected); box-shadow: none; }
 .article-card.touch-pressed:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; transition-duration: 60ms; }
 /*
@@ -207,6 +225,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-card.highlight-releasing > .article-divider,
 .article-card.highlight-releasing + .article-card > .article-divider,
 .article-group:has(> .article-card:last-child.highlight-releasing) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 1; --article-divider-label-opacity: 1; --article-divider-content-duration: var(--article-divider-fade-in,180ms); }
+.article-card.highlight-releasing > .article-divider { --article-divider-below-background: var(--color-canvas); }
+.article-card.highlight-releasing + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child.highlight-releasing) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-canvas); }
 /*
  * Highlight protection controls card feedback only; buttons and links remain immediately usable.
  * 高亮保护只控制卡片反馈，按钮和链接仍可立即操作。
@@ -214,8 +235,11 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-hover-locked .article-card.touch-pressed:not(.reading-highlight) { border-color: transparent; background: transparent; }
 .article-hover-locked .article-card.touch-pressed:not(.reading-highlight) > .article-divider,
 .article-hover-locked .article-card.touch-pressed:not(.reading-highlight) + .article-card:not(.reading-highlight) > .article-divider { --article-divider-line-opacity: 1; --article-divider-label-opacity: 1; --article-divider-content-duration: var(--article-divider-fade-in,180ms); }
+.article-hover-locked .article-card.touch-pressed:not(.reading-highlight) > .article-divider { --article-divider-below-background: var(--color-canvas); }
+.article-hover-locked .article-card.touch-pressed:not(.reading-highlight) + .article-card:not(.reading-highlight) > .article-divider { --article-divider-above-background: var(--color-canvas); }
 @media (prefers-reduced-motion: reduce) {
   .article-divider { --article-divider-fade-in: 0ms; --article-divider-fade-out: 0ms; }
+  .article-time-section { --article-divider-cover-duration: 0ms; }
   .article-card.highlight-releasing { transition-duration: 1ms; }
 }
 .article-card.read { --article-summary-color: var(--color-read-copy); --article-meta-color: var(--color-read-muted); --article-source-icon-opacity: .58; }
@@ -281,6 +305,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover > .article-divider,
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover + .article-card > .article-divider,
   .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 0; --article-divider-label-opacity: .25; --article-divider-content-duration: var(--article-divider-fade-out,120ms); }
+  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) > .article-divider { --article-divider-below-background: var(--color-hover); }
+  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) + .article-card > .article-divider,
+  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected)) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-hover); }
   .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover { background: transparent; color: var(--color-accent-600); }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover .read-state-ring { stroke: var(--color-accent-600); }
