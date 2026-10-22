@@ -79,8 +79,8 @@ export function ArticleContextMenu(props: Props) {
       {props.mixed ? <>
         <div className="article-context-separator" role="separator"/>
         <div className="article-context-feed" title={feedName}><FeedIcon iconUrl={props.feed?.iconUrl}/><span>{feedName}</span></div>
-        <button role="menuitem" onClick={() => run(props.onMarkFeed)}><CheckCheck size={17}/><span>全部Feed已读</span></button>
-        <button role="menuitem" onClick={() => run(props.onSelectFeed)}><ArrowRight size={17}/><span>前往该 Feed</span></button>
+        <button role="menuitem" onClick={() => run(props.onMarkFeed)}><CheckCheck size={17}/><span>此 Feed 全部已读</span></button>
+        <button role="menuitem" onClick={() => run(props.onSelectFeed)}><ArrowRight size={17}/><span>前往此 Feed</span></button>
       </> : null}
     </div>, document.body,
   );
