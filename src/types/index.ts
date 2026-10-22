@@ -87,7 +87,6 @@ export type Article = {
   feedTitle: string;
   feedColor: string;
   publishedAt: number;
-  publishedLabel: string;
   author?: string;
   title: string;
   summaryText: string;

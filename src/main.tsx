@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { ArticleTimeProvider } from "@/lib/time/ArticleTimeProvider";
 import App from "@/app/App";
 import { platform } from "@platform";
 import "@platform/styles.css";
@@ -12,7 +13,7 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App platform={platform}/>
+    <ArticleTimeProvider><App platform={platform}/></ArticleTimeProvider>
   </StrictMode>,
 );
 

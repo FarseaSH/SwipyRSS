@@ -1,3 +1,4 @@
+import { TimeZoneSelect } from "./TimeZoneSelect";
 import { CheckCircle2, Eye, Keyboard, Menu, Settings } from "lucide-react";
 import { FreshRssConnectionForm } from "@/features/connection/components/FreshRssConnectionForm";
 import { useMemo } from "react";
@@ -70,6 +71,7 @@ export function SettingsPage({ connectionDefaults, connection, configured, start
                   { value: "last-list", label: "上一次退出的列表" }]}/>
               <p>重新启动应用时进入指定的文章列表。</p>
             </div>
+            <TimeZoneSelect/>
             <div className="settings-field">
               <label id="swipe-mark-read-label" htmlFor="swipe-mark-read-mode">上滑标记已读</label>
               <SwipeMarkReadSelect value={swipeMarkReadMode} onChange={onSwipeMarkReadModeChange}/>

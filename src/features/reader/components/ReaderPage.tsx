@@ -1,3 +1,5 @@
+import { useArticleTime } from "@/lib/time/ArticleTimeProvider";
+import { formatArticleTime } from "@/lib/time/articleTime";
 import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Share2, Star, UserRound } from "lucide-react";
 import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from "react";
@@ -40,6 +42,8 @@ const SANITIZE_OPTIONS: DOMPurifyConfig = {
  * 展示清洗后的文章正文，并协调阅读手势、状态操作和外链跳转。
  */
 export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, article, feedIconUrl, onBack, onSwipeBack, onKeyboardBack, onPrevious, onNext, onToggleRead, onToggleStar, onOpenExternal, onToast }: Props) {
+  const { now, timeZone } = useArticleTime();
+  const published = formatArticleTime(article.publishedAt, now, timeZone, "reader");
   const panelRef = useRef<HTMLElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -224,7 +228,7 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
               ) : article.title}
             </h1>
             <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-              <span className="inline-flex items-center gap-1.5"><CalendarDays size={14} strokeWidth={1.8} aria-hidden="true"/><time dateTime={new Date(article.publishedAt).toISOString()}>{article.publishedLabel}</time></span>
+              <span className="inline-flex items-center gap-1.5"><CalendarDays size={14} strokeWidth={1.8} aria-hidden="true"/><time dateTime={published.dateTime}>{published.label}</time></span>
               {article.author ? <><span aria-hidden="true">·</span><span className="inline-flex items-center gap-1.5"><UserRound size={14} strokeWidth={1.8} aria-hidden="true"/><span>{article.author}</span></span></> : null}
             </div>
             <div className="reader-html" onClick={openContentLink} dangerouslySetInnerHTML={{ __html: sanitizedContent }}/>
