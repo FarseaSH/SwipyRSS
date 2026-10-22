@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, CircleDot, Inbox, Rss, Settings, Star, TriangleAlert, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { FeedIcon } from "@/components/FeedIcon";
+import { useLayoutEffect, useRef, useState } from "react";
+import { SidebarFeedList } from "./SidebarFeedList";
+import { secondRowScrollTop } from "./sidebarScroll";
 import { UnreadCountBadge } from "@/components/UnreadCountBadge";
 import type { ArticleMode, Feed, FeedFolder } from "@/types";
 
@@ -35,15 +36,72 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
   ));
   const feedsById = new Map(feeds.map((feed) => [feed.id, feed]));
 
-  useEffect(() => {
-    if (selectedFolderId && folders.some((folder) => folder.id === selectedFolderId)) {
-      setExpandedFolderIds((current) => current.has(selectedFolderId) ? current : new Set([selectedFolderId]));
-      return;
-    }
-    if (folders[0]) {
+  const scrollAreaRef = useRef<HTMLElement>(null);
+  const selectionKey = settingsActive || starredSelected ? "" : selectedFeedId ? `feed:${selectedFeedId}` : selectedFolderId ? `folder:${selectedFolderId}` : "";
+  const lastSelectionRef = useRef<string | null>(null);
+  const pendingSelectionRef = useRef(false);
+  const initializedFoldersRef = useRef(folders.length > 0);
+  const positioningFrameRef = useRef(0);
+
+  // Only a changed selection (or its first arrival with async data) requests placement.
+  // Counts, manual expansion and reopening the drawer must preserve the user's position.
+  useLayoutEffect(() => {
+    const folder = selectedFeedId
+      ? folders.find((candidate) => candidate.id === selectedFolderId && candidate.feedIds.includes(selectedFeedId))
+        ?? folders.find((candidate) => candidate.feedIds.includes(selectedFeedId))
+      : folders.find((candidate) => candidate.id === selectedFolderId);
+    if (!initializedFoldersRef.current && folders[0]) {
+      initializedFoldersRef.current = true;
       setExpandedFolderIds((current) => current.size ? current : new Set([folders[0].id]));
     }
-  }, [folders, selectedFolderId]);
+    if (lastSelectionRef.current !== selectionKey && (!selectionKey || folder)) {
+      cancelAnimationFrame(positioningFrameRef.current);
+      lastSelectionRef.current = selectionKey;
+      pendingSelectionRef.current = Boolean(folder);
+      if (folder) setExpandedFolderIds((current) => current.has(folder.id) ? current : new Set([folder.id]));
+    }
+  }, [selectionKey, folders, selectedFolderId, selectedFeedId]);
+
+  useLayoutEffect(() => {
+    if (!pendingSelectionRef.current) return;
+    const area = scrollAreaRef.current;
+    if (!area) return;
+    const group = Array.from(area.querySelectorAll<HTMLElement>("[data-folder-id]")).find((element) =>
+      selectedFeedId
+        ? Array.from(element.querySelectorAll<HTMLElement>("[data-feed-id]")).some((feed) => feed.dataset.feedId === selectedFeedId)
+        : element.dataset.folderId === selectedFolderId);
+    if (!group || !expandedFolderIds.has(group.dataset.folderId!)) return;
+    pendingSelectionRef.current = false;
+    const started = performance.now();
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260;
+    const place = () => {
+      const row = group.querySelector<HTMLElement>(".sidebar-folder-row")!;
+      const viewport = group.querySelector<HTMLElement>(".sidebar-feed-viewport");
+      const activeFeed = Array.from(group.querySelectorAll<HTMLElement>("[data-feed-id]")).find((feed) => feed.dataset.feedId === selectedFeedId);
+      if (viewport && activeFeed) {
+        viewport.scrollTop = secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight);
+      }
+      area.scrollTop = secondRowScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
+      // Track the changing content boundary while folders expand/collapse, including on mobile
+      // while the drawer is offscreen. Never replay this on the next drawer-open event.
+      if (performance.now() - started < duration) positioningFrameRef.current = requestAnimationFrame(place);
+    };
+    place();
+  }, [selectionKey, expandedFolderIds, folders, feeds, selectedFolderId, selectedFeedId]);
+
+  useLayoutEffect(() => {
+    const area = scrollAreaRef.current;
+    const cancel = () => { cancelAnimationFrame(positioningFrameRef.current); pendingSelectionRef.current = false; };
+    area?.addEventListener("wheel", cancel, { passive: true });
+    area?.addEventListener("pointerdown", cancel, true);
+    area?.addEventListener("keydown", cancel, true);
+    return () => {
+      cancel();
+      area?.removeEventListener("wheel", cancel);
+      area?.removeEventListener("pointerdown", cancel, true);
+      area?.removeEventListener("keydown", cancel, true);
+    };
+  }, []);
 
   const openSettings = () => { onOpenSettings(); onClose(); };
   const select = (next: ArticleMode) => { onSelectMode(next); onClose(); };
@@ -73,7 +131,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
         <button className={`sidebar-item ${!settingsActive && starredSelected ? "active" : ""}`} onClick={selectStarred}><Star className="sidebar-starred-icon" size={17}/>星标文章</button>
       </nav>
       <div className="mt-7 mb-2 flex items-center px-3 text-[11px] font-bold uppercase tracking-[.12em] text-muted"><span>订阅源</span><ChevronDown className="ml-auto" size={14}/></div>
-      <nav className="sidebar-scroll-area min-h-0 flex-1 space-y-1 overflow-y-auto pr-1" aria-label="订阅源">
+      <nav ref={scrollAreaRef} className="sidebar-scroll-area min-h-0 flex-1 space-y-1 overflow-y-auto pr-1" aria-label="订阅源">
         {folders.map((folder) => {
           const expanded = expandedFolderIds.has(folder.id);
           const folderPageActive = !settingsActive && selectedFolderId === folder.id && !selectedFeedId;
@@ -85,21 +143,19 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
             0,
           );
           return (
-            <div key={folder.id} className="sidebar-folder-group block w-full">
+            <div key={folder.id} data-folder-id={folder.id} className="sidebar-folder-group block w-full">
               <div className={`sidebar-folder-row flex w-full min-w-0 items-center ${folderPageActive ? "active" : ""}`}>
                 <button className="sidebar-folder-toggle icon-button" onClick={() => toggleFolder(folder.id)} aria-label={`${expanded ? "收起" : "展开"}${folder.name}`} aria-expanded={expanded}>{expanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}</button>
-                <button className="sidebar-folder-link sidebar-item min-w-0 flex-1" onClick={() => selectFolder(folder.id)}><span className="truncate">{folder.name}</span><UnreadCountBadge className="ml-auto" count={folderUnreadCount}/></button>
+                <button className="sidebar-folder-link sidebar-item min-w-0 flex-1" aria-current={folderPageActive ? "page" : undefined} onClick={() => selectFolder(folder.id)}><span className="truncate">{folder.name}</span><UnreadCountBadge className="ml-auto" count={folderUnreadCount}/></button>
               </div>
-              {expanded ? (
-                <div className="sidebar-feed-list block w-auto">
-                  {folder.feedIds.map((feedId) => {
-                    const feed = feedsById.get(feedId);
-                    if (!feed) return null;
-                    const feedUnreadCount = feedUnreadCounts[feedId] ?? feed.unreadCount ?? 0;
-                    return <button key={feedId} className={`sidebar-feed-item sidebar-item w-full ${!settingsActive && selectedFeedId === feedId ? "active" : ""}`} onClick={() => selectFeed(feedId)}><FeedIcon iconUrl={feed.iconUrl}/><span className="truncate">{feed.title}</span><UnreadCountBadge className="ml-auto" count={feedUnreadCount}/></button>;
-                  })}
-                </div>
-              ) : null}
+              <SidebarFeedList
+                expanded={expanded}
+                feeds={folder.feedIds.map((id) => feedsById.get(id)).filter((feed): feed is Feed => Boolean(feed))}
+                folderName={folder.name}
+                selectedFeedId={settingsActive ? null : selectedFeedId}
+                feedUnreadCounts={feedUnreadCounts}
+                onSelectFeed={selectFeed}
+              />
             </div>
           );
         })}
