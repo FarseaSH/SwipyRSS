@@ -97,8 +97,8 @@ test("first-line inset is included in fixed-height pagination without accumulati
   const layouts = Object.fromEntries(articles.map((article, index) => [article.id, { heightClass: ["compact", "title-only", "standard"][index % 3] }]));
   const pages = paginateArticles(articles, layouts, 400);
   assert.equal(pages[0].snapOffset, 0);
-  assert.equal(pages[0].startOffset, 18);
-  assert.equal(pages[1].startOffset, 18 + 82 + 92 + 104 + 82);
+  assert.equal(pages[0].startOffset, 8);
+  assert.equal(pages[1].startOffset, 8 + 82 + 92 + 104 + 82);
   assert.equal(pages[1].snapOffset, pages[1].startOffset - 49);
   assert.equal(pages[0].bottomMaskOffset, pages[1].startOffset);
   assert.equal(pages.flatMap((page) => page.articles).length, articles.length);

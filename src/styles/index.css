@@ -177,7 +177,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
  * 单指横向开侧栏、纵向翻页由应用处理，双指缩放保留给浏览器。
  */
 .article-viewport { --list-safe-area-bottom: env(safe-area-inset-bottom,0px); position: relative; min-height: 0; flex: 1; overflow: clip; border-radius: 16px; overscroll-behavior: contain; scroll-margin-top: 80px; touch-action: pinch-zoom; }
-.article-track { display: flex; width: 100%; max-width: 792px; min-height: 100%; flex-direction: column; margin-inline: auto; padding-top: 18px; will-change: transform; }
+.article-track { display: flex; width: 100%; max-width: 792px; min-height: 100%; flex-direction: column; margin-inline: auto; padding-top: 8px; will-change: transform; }
 .article-group { position: relative; display: flex; flex-direction: column; }
 .article-card { --article-summary-color: var(--color-copy); --article-meta-color: var(--color-muted); --article-source-icon-opacity: 1; position: relative; display: grid; height: 104px; min-height: 0; flex: 0 0 104px; cursor: pointer; grid-template-columns: 36px minmax(0,1fr) 36px; gap: 4px; overflow: visible; border: 1px solid transparent; border-radius: 16px; padding: 12px 2px; transition: 180ms; }
 .article-card.compact { height: 82px; flex-basis: 82px; }
@@ -186,8 +186,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 /* Labels live on the existing boundary without changing any card's fixed height. */
 .article-divider { position: absolute; top: -8px; right: 16px; left: 16px; z-index: 2; display: flex; height: 16px; align-items: center; gap: 8px; pointer-events: none; }
 .article-divider::before, .article-divider::after { height: 1px; flex: 1; background: var(--color-line); content: ""; }
+/* Match the source icon's left edge: card padding + action column + column gap - divider inset - label gap. */
+.article-divider:not(:empty)::before { flex: 0 0 18px; }
 .article-divider:empty { gap: 0; }
-.article-time-section { flex: none; color: var(--color-muted); font-size: 11px; font-weight: 500; line-height: 16px; white-space: nowrap; }
+.article-time-section { flex: none; color: var(--color-line); font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
 .article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider,
 .article-card:is(.selected,.touch-pressed,.reading-highlight) + .article-card > .article-divider,
 .article-group:has(> .article-card:last-child:is(.selected,.touch-pressed,.reading-highlight)) + .article-group > .article-card:first-child > .article-divider { opacity: 0; }
@@ -506,6 +508,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 @media (min-width: 1024px) {
   .sidebar-close-button { display: none; }
   .article-card { grid-template-columns: 36px minmax(0,1fr) 36px; gap: 8px; padding: 16px 8px 10px; }
+  .article-divider:not(:empty)::before { flex-basis: 28px; }
   .floating-switch { left: calc(284px + (100vw - 284px)/2); }
   .reader-back-button { left: 24px; }
   .reader-article-nav { right: 24px; }

@@ -4,7 +4,7 @@ import type { Article, ArticleCardLayout } from "@/types";
 const HEADER_AND_GUTTER = 88;
 const TOP_PREVIEW_SPACE = 49;
 // Keep in sync with .article-track padding-top; only the beginning of the track needs space.
-const TRACK_TOP_INSET = 18;
+const TRACK_TOP_INSET = 8;
 const COMPACT_ARTICLE_HEIGHT = 82;
 const TITLE_ONLY_ARTICLE_HEIGHT = 92;
 const STANDARD_ARTICLE_HEIGHT = 104;
