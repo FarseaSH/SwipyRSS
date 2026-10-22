@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ReadStateIcon } from "@/components/ReadStateIcon";
 import type { Article, ArticleCardLayout } from "@/types";
 import { ArticleCardVisual, ArticleSourceIcon, ArticleSourceLabel } from "./ArticleCardVisual";
+import { ArticleShortcutNumber } from "./ArticleShortcutNumber";
 
 type Props = {
   listNow: number;
@@ -10,6 +11,7 @@ type Props = {
   feedIconUrl?: string;
   active: boolean;
   shortcutNumber?: number;
+  starShortcutNumber?: number;
   highlightPhase: "idle" | "reading" | "holding" | "releasing";
   onHighlightEnd: () => void;
   feedLinkEnabled: boolean;
@@ -26,7 +28,7 @@ type Props = {
  * Render one article while separating feed navigation and state actions from opening the card.
  * 渲染单篇文章，并把来源跳转和状态操作与卡片打开动作隔离。
  */
-export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
+export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNumber, starShortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
   const [sourceNotice, setSourceNotice] = useState("");
   const [sourceNoticeVisible, setSourceNoticeVisible] = useState(false);
   const [titleFitsOneLine, setTitleFitsOneLine] = useState(false);
@@ -151,8 +153,8 @@ export function ArticleCard({ listNow, article, feedIconUrl, active, shortcutNum
           ) : (
             <ArticleSourceLabel article={article} iconUrl={feedIconUrl}/>
           )}
-        readAction={<button className="icon-button article-read-button" aria-label={article.isRead ? "取消已读" : "标记已读"} title={article.isRead ? "取消已读" : "标记已读"} onClick={(e) => { e.stopPropagation(); onToggleRead(); }}>{shortcutNumber ? <span className="article-shortcut-number" aria-hidden="true">{shortcutNumber}</span> : <ReadStateIcon isRead={article.isRead} size={18}/>}</button>}
-        starAction={<button className={`icon-button article-star-button ${article.isStarred ? "starred" : ""}`} aria-label={article.isStarred ? "取消星标" : "加入星标"} onClick={(e) => { e.stopPropagation(); onToggleStar(); }}><Star size={17} fill={article.isStarred ? "currentColor" : "none"}/></button>}
+        readAction={<button className="icon-button article-read-button" aria-label={article.isRead ? "取消已读" : "标记已读"} title={article.isRead ? "取消已读" : "标记已读"} onClick={(e) => { e.stopPropagation(); onToggleRead(); }}>{shortcutNumber ? <ArticleShortcutNumber number={shortcutNumber}/> : <ReadStateIcon isRead={article.isRead} size={18}/>}</button>}
+        starAction={<button className={`icon-button article-star-button ${article.isStarred ? "starred" : ""} ${starShortcutNumber ? "showing-shortcut" : ""}`} aria-label={article.isStarred ? "取消星标" : "加入星标"} onClick={(e) => { e.stopPropagation(); onToggleStar(); }}>{starShortcutNumber ? <ArticleShortcutNumber number={starShortcutNumber}/> : <Star size={17} fill={article.isStarred ? "currentColor" : "none"}/>}</button>}
       />
     </article>
   );
