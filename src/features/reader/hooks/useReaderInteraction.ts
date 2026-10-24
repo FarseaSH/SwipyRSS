@@ -34,7 +34,7 @@ function clearTransientTextSelection(): void {
 
 /**
  * Coordinate native vertical content scrolling, keyboard paging, double-click positioning, and
- * swipe-right return. Leave vertical wheel, trackpad, and touch scrolling to the WebView; handle
+ * swipe-right return and touch-only swipe-left opening. Leave vertical wheel, trackpad, and touch scrolling to the WebView; handle
  * only explicit keyboard paging, desktop/mobile double taps, and horizontal touch or trackpad
  * return gestures.
  *
@@ -52,6 +52,8 @@ export function useReaderInteraction(
   onKeyboardBack?: () => void,
   keyboardEnabled = true,
   sideToolbar = false,
+  onSwipeLeft?: () => void,
+  swipeLeftHintRef?: RefObject<HTMLDivElement | null>,
 ) {
   const [toolbarDimmed, setToolbarDimmed] = useState(sideToolbar);
   const animationRef = useRef<number | null>(null);
@@ -117,7 +119,7 @@ export function useReaderInteraction(
     const viewport = viewportRef.current;
     if (!viewport) return;
 
-    // Touch pointers handle only horizontal return and mobile double taps; the WebView handles
+    // Touch pointers handle horizontal navigation and mobile double taps; the WebView handles
     // vertical movement natively.
     // 触摸指针只负责横向返回和移动端双击识别；纵向移动由 WebView 原生处理。
     let pointerId: number | null = null;
@@ -127,7 +129,8 @@ export function useReaderInteraction(
     let pointerLastX = 0;
     let pointerLastTime = 0;
     let horizontalVelocity = 0;
-    let pointerAxis: "horizontal" | "code" | "native" | null = null;
+    let pointerAxis: "horizontal" | "external" | "code" | "native" | null = null;
+    let externalSwipeEligible = false;
     let pointerCodeBlock: HTMLElement | null = null;
     let pointerCodeBlockStartScrollLeft = 0;
     let touchTapEligible = false;
@@ -350,15 +353,33 @@ export function useReaderInteraction(
 
     // Part 3: native mobile vertical scrolling, double-tap positioning, and horizontal return.
     // 第三部分：移动端原生纵向滚动、双击定位和横向返回。
+    const hideExternalHint = () => {
+      swipeLeftHintRef?.current?.removeAttribute("data-visible");
+      swipeLeftHintRef?.current?.removeAttribute("data-ready");
+    };
+
+    // Require actual travel even for a flick; a paused or reversed swipe must not open a tab.
+    // 快滑仍需足够位移；停顿或反向回拖后不能误开原文。
+    const acceptsExternalSwipe = (distance: number, now: number) => distance >= 84
+      || (distance >= 32 && horizontalVelocity < -0.55 && now - pointerLastTime < 100);
+
     const resetPointer = () => {
       pointerId = null;
       pointerAxis = null;
       pointerCodeBlock = null;
       touchTapEligible = false;
+      externalSwipeEligible = false;
+      hideExternalHint();
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if ((event.pointerType !== "touch" && event.pointerType !== "pen") || pointerId !== null) return;
+      if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+      if (pointerId !== null || !event.isPrimary) {
+        if (pointerAxis === "horizontal") settlePanelSwipe(false);
+        resetPointer();
+        return;
+      }
+      if (!keyboardEnabled || horizontalSettling) return;
       pointerId = event.pointerId;
       pointerStartX = pointerLastX = event.clientX;
       pointerStartY = event.clientY;
@@ -374,6 +395,8 @@ export function useReaderInteraction(
         : null;
       pointerCodeBlockStartScrollLeft = pointerCodeBlock?.scrollLeft ?? 0;
       touchTapEligible = event.pointerType === "touch" && !isInteractiveReaderTarget(event.target);
+      externalSwipeEligible = touchTapEligible && Boolean(onSwipeLeft)
+        && (window.getSelection()?.isCollapsed ?? true);
       cancelProgrammaticScroll();
     };
 
@@ -387,6 +410,10 @@ export function useReaderInteraction(
         if (Math.max(Math.abs(dx), Math.abs(dy)) < POINTER_AXIS_SLOP) return;
         if (pointerCodeBlock && Math.abs(dx) > Math.abs(dy)) {
           pointerAxis = "code";
+          viewport.setPointerCapture(event.pointerId);
+        } else if (dx < 0 && externalSwipeEligible && Math.abs(dx) > Math.abs(dy) * 1.25) {
+          if (Math.abs(dx) < 8) return;
+          pointerAxis = "external";
           viewport.setPointerCapture(event.pointerId);
         } else if (dx > 0 && Math.abs(dx) > Math.abs(dy)) {
           pointerAxis = "horizontal";
@@ -404,13 +431,23 @@ export function useReaderInteraction(
         pointerCodeBlock.scrollLeft = pointerCodeBlockStartScrollLeft - dx;
         return;
       }
-      if (pointerAxis !== "horizontal") return;
+      if (pointerAxis !== "horizontal" && pointerAxis !== "external") return;
 
       event.preventDefault();
       const now = performance.now();
       horizontalVelocity = (event.clientX - pointerLastX) / Math.max(1, now - pointerLastTime);
       pointerLastX = event.clientX;
       pointerLastTime = now;
+      if (pointerAxis === "external") {
+        const hint = swipeLeftHintRef?.current;
+        const distance = Math.max(0, -dx);
+        if (hint) {
+          hint.style.setProperty("--swipe-progress", String(Math.min(1, distance / 84)));
+          hint.toggleAttribute("data-visible", distance > 0);
+          hint.toggleAttribute("data-ready", acceptsExternalSwipe(distance, now));
+        }
+        return;
+      }
       const panel = panelRef.current;
       if (panel) {
         const offset = Math.max(0, Math.min(viewport.clientWidth, dx));
@@ -423,6 +460,18 @@ export function useReaderInteraction(
       if (event.pointerId !== pointerId) return;
       const now = performance.now();
       const dx = event.clientX - pointerStartX;
+
+      if (pointerAxis === "external") {
+        const accepted = event.type === "pointerup" && acceptsExternalSwipe(-dx, now)
+          && (window.getSelection()?.isCollapsed ?? true);
+        event.preventDefault();
+        lastTouchTapTime = 0;
+        resetPointer();
+        // Open synchronously inside pointerup to retain Safari/PWA user activation.
+        // 在松手事件中同步打开，保留 Safari/PWA 的用户激活状态。
+        if (accepted) onSwipeLeft?.();
+        return;
+      }
 
       if (pointerAxis === "horizontal") {
         const accepted = event.type === "pointerup" && (dx > 84 || horizontalVelocity > 0.55);
@@ -550,6 +599,7 @@ export function useReaderInteraction(
     viewport.addEventListener("pointermove", onPointerMove, { passive: false });
     viewport.addEventListener("pointerup", onPointerEnd, { passive: false });
     viewport.addEventListener("pointercancel", onPointerEnd);
+    viewport.addEventListener("lostpointercapture", onPointerEnd);
     viewport.addEventListener("dblclick", onDoubleClick);
     viewport.addEventListener("wheel", onWheel, { passive: false });
     viewport.addEventListener("keydown", onKeyDown);
@@ -564,16 +614,18 @@ export function useReaderInteraction(
       window.clearTimeout(trackpadIdleTimer);
       window.cancelAnimationFrame(swipeSettleFrame);
       clearPanelMotion();
+      hideExternalHint();
       viewport.removeEventListener("pointerdown", onPointerDown);
       viewport.removeEventListener("pointermove", onPointerMove);
       viewport.removeEventListener("pointerup", onPointerEnd);
       viewport.removeEventListener("pointercancel", onPointerEnd);
+      viewport.removeEventListener("lostpointercapture", onPointerEnd);
       viewport.removeEventListener("dblclick", onDoubleClick);
       viewport.removeEventListener("wheel", onWheel);
       viewport.removeEventListener("keydown", onKeyDown);
       viewport.removeEventListener("scroll", onScroll);
     };
-  }, [continuityMarkerRef, hideContinuityMarker, hidePositionMarker, keyboardEnabled, sideToolbar, onKeyboardBack, onSwipeRight, panelRef, positionMarkerRef, setDimmed, stopAnimation, viewportRef]);
+  }, [continuityMarkerRef, hideContinuityMarker, hidePositionMarker, keyboardEnabled, sideToolbar, onKeyboardBack, onSwipeRight, onSwipeLeft, swipeLeftHintRef, panelRef, positionMarkerRef, setDimmed, stopAnimation, viewportRef]);
 
   const resetToolbar = useCallback(() => {
     wakeToolbar();

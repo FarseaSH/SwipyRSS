@@ -1,6 +1,6 @@
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Share2, Star, UserRound } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, ExternalLink, Share2, Star, UserRound } from "lucide-react";
 import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
-import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from "react";
 import { useSideToolbarDismiss } from "@/components/useSideToolbarDismiss";
 import { ToolbarAnchor } from "@/components/ToolbarAnchor";
 import { FeedIcon } from "@/components/FeedIcon";
@@ -45,6 +45,14 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
   const viewportRef = useRef<HTMLDivElement>(null);
   const continuityMarkerRef = useRef<HTMLDivElement>(null);
   const positionMarkerRef = useRef<HTMLDivElement>(null);
+  const swipeLeftHintRef = useRef<HTMLDivElement>(null);
+  const originalArticleUrl = useMemo(
+    () => normalizeExternalHttpUrl(article.articleUrl),
+    [article.articleUrl],
+  );
+  const openOriginalArticle = useCallback(() => {
+    if (originalArticleUrl) onOpenExternal(originalArticleUrl);
+  }, [onOpenExternal, originalArticleUrl]);
   const { toolbarDimmed, wakeToolbar, resetToolbar, collapseToolbar } = useReaderInteraction(
     viewportRef,
     continuityMarkerRef,
@@ -54,16 +62,15 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
     onKeyboardBack,
     open && !obscured,
     toolbarPosition !== "bottom",
+    originalArticleUrl ? openOriginalArticle : undefined,
+    swipeLeftHintRef,
   );
   useSideToolbarDismiss(toolbarRef, open && !obscured && toolbarPosition !== "bottom" && !toolbarDimmed, collapseToolbar);
   const sanitizedContent = useMemo(
     () => sanitizeArticleHtml(article.contentHtml, article.articleUrl),
     [article.articleUrl, article.contentHtml],
   );
-  const originalArticleUrl = useMemo(
-    () => normalizeExternalHttpUrl(article.articleUrl),
-    [article.articleUrl],
-  );
+
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -204,7 +211,7 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
         <button className="reader-article-nav-button" onClick={onNext} disabled={!onNext} aria-label={onNext ? "下一篇文章" : "没有下一篇文章"}><ChevronDown size={20}/></button>
       </div>
 
-      <div ref={viewportRef} className="reader-viewport" tabIndex={-1} aria-label="文章正文，可双击定位或使用方向键翻屏，[ 和 ] 切换文章，回车打开原文，S 切换收藏">
+      <div ref={viewportRef} className="reader-viewport" tabIndex={-1} aria-label="文章正文，可双击定位或使用方向键翻屏，[ 和 ] 切换文章，回车或触屏左滑打开原文，S 切换收藏">
         <article className="reader-document" lang={article.language}>
           <div ref={continuityMarkerRef} className="continuity-marker" aria-hidden="true"/>
           <div ref={positionMarkerRef} className="position-marker" aria-hidden="true"/>
@@ -230,6 +237,12 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
             <div className="reader-html" onClick={openContentLink} dangerouslySetInnerHTML={{ __html: sanitizedContent }}/>
           </div>
         </article>
+      </div>
+
+      <div ref={swipeLeftHintRef} className="reader-external-swipe-hint" aria-hidden="true">
+        <ExternalLink size={18}/>
+        <span className="reader-external-swipe-prompt">左滑打开原文</span>
+        <span className="reader-external-swipe-ready">松开打开原文</span>
       </div>
 
       <ToolbarAnchor position={toolbarPosition}>
