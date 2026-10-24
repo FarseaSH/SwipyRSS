@@ -23,6 +23,22 @@ export function isInteractiveReaderTarget(target: EventTarget | null): boolean {
   ));
 }
 
+// Links remain swipeable; actual controls and editors retain their own interaction.
+function isReaderGestureControl(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(
+    "button, input, textarea, select, option, [contenteditable]:not([contenteditable='false']), [role='button']",
+  ));
+}
+
+function findHorizontalScrollTarget(target: EventTarget | null, viewport: HTMLElement): HTMLElement | null {
+  for (let element = target instanceof Element ? target : null;
+    element && element !== viewport && viewport.contains(element); element = element.parentElement) {
+    if (element instanceof HTMLElement && element.scrollWidth > element.clientWidth + 1
+      && /^(auto|scroll|overlay)$/.test(window.getComputedStyle(element).overflowX)) return element;
+  }
+  return null;
+}
+
 /**
  * Clear the word selection created by a double-click only after confirming a positioning gesture;
  * preserve long-press text selection.
@@ -60,6 +76,8 @@ export function useReaderInteraction(
   const continuityMarkerTimerRef = useRef<number | null>(null);
   const positionMarkerTimerRef = useRef<number | null>(null);
   const assistDelayTimerRef = useRef<number | null>(null);
+  // Keep suppression across effect re-registration when returning to the list.
+  const suppressSwipeClickUntilRef = useRef(0);
 
   const setDimmed = useCallback((value: boolean) => {
     setToolbarDimmed(value);
@@ -129,10 +147,10 @@ export function useReaderInteraction(
     let pointerLastX = 0;
     let pointerLastTime = 0;
     let horizontalVelocity = 0;
-    let pointerAxis: "horizontal" | "external" | "code" | "native" | null = null;
+    let pointerAxis: "horizontal" | "external" | "scroll" | "native" | null = null;
     let externalSwipeEligible = false;
-    let pointerCodeBlock: HTMLElement | null = null;
-    let pointerCodeBlockStartScrollLeft = 0;
+    let pointerScrollTarget: HTMLElement | null = null;
+    let pointerStartScrollLeft = 0;
     let touchTapEligible = false;
     let lastTouchTapTime = 0;
     let lastTouchTapX = 0;
@@ -366,20 +384,22 @@ export function useReaderInteraction(
     const resetPointer = () => {
       pointerId = null;
       pointerAxis = null;
-      pointerCodeBlock = null;
+      pointerScrollTarget = null;
       touchTapEligible = false;
       externalSwipeEligible = false;
       hideExternalHint();
     };
 
     const onPointerDown = (event: PointerEvent) => {
+      suppressSwipeClickUntilRef.current = 0;
       if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
       if (pointerId !== null || !event.isPrimary) {
         if (pointerAxis === "horizontal") settlePanelSwipe(false);
         resetPointer();
         return;
       }
-      if (!keyboardEnabled || horizontalSettling) return;
+      if (!keyboardEnabled || horizontalSettling || isReaderGestureControl(event.target)
+        || !(window.getSelection()?.isCollapsed ?? true)) return;
       pointerId = event.pointerId;
       pointerStartX = pointerLastX = event.clientX;
       pointerStartY = event.clientY;
@@ -387,29 +407,28 @@ export function useReaderInteraction(
       pointerLastTime = performance.now();
       horizontalVelocity = 0;
       pointerAxis = null;
-      const codeBlock = event.target instanceof Element
-        ? event.target.closest<HTMLElement>("[data-reader-horizontal-scroll]")
-        : null;
-      pointerCodeBlock = codeBlock && codeBlock.scrollWidth > codeBlock.clientWidth
-        ? codeBlock
-        : null;
-      pointerCodeBlockStartScrollLeft = pointerCodeBlock?.scrollLeft ?? 0;
+      pointerScrollTarget = findHorizontalScrollTarget(event.target, viewport);
+      pointerStartScrollLeft = pointerScrollTarget?.scrollLeft ?? 0;
       touchTapEligible = event.pointerType === "touch" && !isInteractiveReaderTarget(event.target);
-      externalSwipeEligible = touchTapEligible && Boolean(onSwipeLeft)
-        && (window.getSelection()?.isCollapsed ?? true);
+      externalSwipeEligible = event.pointerType === "touch" && Boolean(onSwipeLeft);
       cancelProgrammaticScroll();
     };
 
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return;
+      if (!(window.getSelection()?.isCollapsed ?? true)) {
+        if (pointerAxis === "horizontal") settlePanelSwipe(false);
+        resetPointer();
+        return;
+      }
       const dx = event.clientX - pointerStartX;
       const dy = event.clientY - pointerStartY;
       if (Math.max(Math.abs(dx), Math.abs(dy)) >= POINTER_AXIS_SLOP) touchTapEligible = false;
 
       if (!pointerAxis) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) < POINTER_AXIS_SLOP) return;
-        if (pointerCodeBlock && Math.abs(dx) > Math.abs(dy)) {
-          pointerAxis = "code";
+        if (pointerScrollTarget && Math.abs(dx) > Math.abs(dy)) {
+          pointerAxis = "scroll";
           viewport.setPointerCapture(event.pointerId);
         } else if (dx < 0 && externalSwipeEligible && Math.abs(dx) > Math.abs(dy) * 1.25) {
           if (Math.abs(dx) < 8) return;
@@ -426,15 +445,18 @@ export function useReaderInteraction(
           return;
         }
       }
-      if (pointerAxis === "code" && pointerCodeBlock) {
+      if (pointerAxis === "scroll" && pointerScrollTarget) {
         event.preventDefault();
-        pointerCodeBlock.scrollLeft = pointerCodeBlockStartScrollLeft - dx;
+        suppressSwipeClickUntilRef.current = performance.now() + 700;
+        // Lock ownership for the entire gesture, including at either scroll boundary.
+        pointerScrollTarget.scrollLeft = pointerStartScrollLeft - dx;
         return;
       }
       if (pointerAxis !== "horizontal" && pointerAxis !== "external") return;
 
       event.preventDefault();
       const now = performance.now();
+      suppressSwipeClickUntilRef.current = now + 700;
       horizontalVelocity = (event.clientX - pointerLastX) / Math.max(1, now - pointerLastTime);
       pointerLastX = event.clientX;
       pointerLastTime = now;
@@ -460,6 +482,9 @@ export function useReaderInteraction(
       if (event.pointerId !== pointerId) return;
       const now = performance.now();
       const dx = event.clientX - pointerStartX;
+      if (pointerAxis === "horizontal" || pointerAxis === "external" || pointerAxis === "scroll") {
+        suppressSwipeClickUntilRef.current = now + 700;
+      }
 
       if (pointerAxis === "external") {
         const accepted = event.type === "pointerup" && acceptsExternalSwipe(-dx, now)
@@ -474,7 +499,8 @@ export function useReaderInteraction(
       }
 
       if (pointerAxis === "horizontal") {
-        const accepted = event.type === "pointerup" && (dx > 84 || horizontalVelocity > 0.55);
+        const accepted = event.type === "pointerup" && (dx > 84 || horizontalVelocity > 0.55)
+          && (window.getSelection()?.isCollapsed ?? true);
         settlePanelSwipe(accepted);
         resetPointer();
         return;
@@ -506,6 +532,21 @@ export function useReaderInteraction(
       resetPointer();
     };
 
+    const onLostPointerCapture = (event: PointerEvent) => {
+      // A descendant loses implicit capture when we transfer it to the viewport.
+      // That bubbled event is not cancellation of the viewport's gesture.
+      if (event.target !== viewport || viewport.hasPointerCapture(event.pointerId)) return;
+      onPointerEnd(event);
+    };
+
+    const onClickCapture = (event: MouseEvent) => {
+      if (performance.now() >= suppressSwipeClickUntilRef.current) return;
+      if (event.detail === 0 && (event as PointerEvent).pointerType !== "touch") return;
+      suppressSwipeClickUntilRef.current = 0;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
     /**
      * Use native dblclick on desktop and deduplicate synthetic touch events by timestamp.
      * 桌面端使用原生 dblclick；触屏合成事件由时间戳去重。
@@ -530,10 +571,7 @@ export function useReaderInteraction(
         return;
       }
 
-      const codeBlock = event.target instanceof Element
-        ? event.target.closest<HTMLElement>("[data-reader-horizontal-scroll]")
-        : null;
-      if (codeBlock && codeBlock.scrollWidth > codeBlock.clientWidth) {
+      if (findHorizontalScrollTarget(event.target, viewport)) {
         cancelProgrammaticScroll();
         return;
       }
@@ -599,7 +637,8 @@ export function useReaderInteraction(
     viewport.addEventListener("pointermove", onPointerMove, { passive: false });
     viewport.addEventListener("pointerup", onPointerEnd, { passive: false });
     viewport.addEventListener("pointercancel", onPointerEnd);
-    viewport.addEventListener("lostpointercapture", onPointerEnd);
+    viewport.addEventListener("lostpointercapture", onLostPointerCapture);
+    viewport.addEventListener("click", onClickCapture, true);
     viewport.addEventListener("dblclick", onDoubleClick);
     viewport.addEventListener("wheel", onWheel, { passive: false });
     viewport.addEventListener("keydown", onKeyDown);
@@ -619,7 +658,8 @@ export function useReaderInteraction(
       viewport.removeEventListener("pointermove", onPointerMove);
       viewport.removeEventListener("pointerup", onPointerEnd);
       viewport.removeEventListener("pointercancel", onPointerEnd);
-      viewport.removeEventListener("lostpointercapture", onPointerEnd);
+      viewport.removeEventListener("lostpointercapture", onLostPointerCapture);
+      viewport.removeEventListener("click", onClickCapture, true);
       viewport.removeEventListener("dblclick", onDoubleClick);
       viewport.removeEventListener("wheel", onWheel);
       viewport.removeEventListener("keydown", onKeyDown);

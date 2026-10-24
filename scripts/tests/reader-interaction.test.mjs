@@ -16,14 +16,19 @@ function reader({ enabled = true, hasUrl = true } = {}) {
   let selected = false;
   let cleanup;
   const frames = [];
+  const captures = [];
+  let captureOwner = null;
+  let pendingCapture = null;
   class Element {
     constructor(kind) {
       this.kind = kind;
+      this.parentElement = null;
+      this.overflowX = kind === "code" || kind === "scroller" ? "auto" : "visible";
       this.attrs = new Set();
       this.style = { setProperty() {} };
       this.classList = { remove() {}, add() {} };
       this.scrollTop = 0;
-      this.scrollLeft = 0;
+      this._scrollLeft = 0;
       this.clientWidth = 390;
       this.clientHeight = 800;
       this.scrollWidth = 390;
@@ -31,12 +36,21 @@ function reader({ enabled = true, hasUrl = true } = {}) {
       this.handlers = new Map();
     }
     closest(selector) {
-      if (selector === "[data-reader-horizontal-scroll]") return this.kind === "code" ? this : null;
-      return ["link", "button", "input", "editable", "code"].includes(this.kind) ? this : null;
+      const matches = this.kind === "link" ? selector.startsWith("a,")
+        : this.kind === "code" ? selector.includes("[data-reader-horizontal-scroll]")
+          : ["button", "input", "editable"].includes(this.kind);
+      return matches ? this : this.parentElement?.closest(selector) ?? null;
     }
+    contains(element) {
+      for (let node = element; node; node = node.parentElement) if (node === this) return true;
+      return false;
+    }
+    get scrollLeft() { return this._scrollLeft; }
+    set scrollLeft(value) { this._scrollLeft = Math.max(0, Math.min(this.scrollWidth - this.clientWidth, value)); }
     addEventListener(type, handler) { this.handlers.set(type, handler); }
     removeEventListener(type) { this.handlers.delete(type); }
-    setPointerCapture() {}
+    setPointerCapture() { pendingCapture = this; }
+    hasPointerCapture() { return pendingCapture === this; }
     toggleAttribute(name, value) { if (value) this.attrs.add(name); else this.attrs.delete(name); }
     removeAttribute(name) { this.attrs.delete(name); }
   }
@@ -47,13 +61,14 @@ function reader({ enabled = true, hasUrl = true } = {}) {
   const exports = {};
   const browser = {
     getSelection: () => ({ isCollapsed: !selected }),
+    getComputedStyle: element => ({ overflowX: element.overflowX }),
     clearTimeout() {},
     setTimeout: () => 1,
     cancelAnimationFrame() {},
     requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
   };
   vm.runInNewContext(compiled, {
-    exports, Element, performance: { now: () => now }, window: browser,
+    exports, Element, HTMLElement: Element, performance: { now: () => now }, window: browser,
     requestAnimationFrame: browser.requestAnimationFrame, cancelAnimationFrame() {},
     require: () => ({
       useCallback: fn => fn, useEffect: fn => effects.push(fn),
@@ -66,16 +81,35 @@ function reader({ enabled = true, hasUrl = true } = {}) {
     hasUrl ? () => { opened += 1; } : undefined, ref(hint));
   cleanup = effects[0]();
   const target = new Element();
+  target.parentElement = viewport;
   function event(type, x, y = 300, options = {}) {
     now += options.elapsed ?? 200;
-    const e = { type, pointerType: "touch", pointerId: 1, isPrimary: true,
-      clientX: x, clientY: y, target, preventDefault() { this.prevented = true; }, ...options };
+    const e = { type, pointerType: "touch", pointerId: 1, isPrimary: true, detail: 1,
+      clientX: x, clientY: y, target, currentTarget: viewport,
+      preventDefault() { this.prevented = true; },
+      stopImmediatePropagation() { this.stopped = true; }, ...options };
+    // Touch starts implicit capture on the hit element. Explicit transfer is processed
+    // before the next pointer event and lostpointercapture bubbles from the old owner.
+    if (type === "pointerdown" && e.isPrimary) pendingCapture = e.target;
+    if (["pointermove", "pointerup", "pointercancel"].includes(type) && captureOwner !== pendingCapture) {
+      if (captureOwner) {
+        captures.push(captureOwner);
+        viewport.handlers.get("lostpointercapture")?.({ ...e, type: "lostpointercapture", target: captureOwner });
+      }
+      captureOwner = pendingCapture;
+    }
+    if (type === "lostpointercapture" && e.target === viewport) {
+      captureOwner = pendingCapture = null;
+    }
     viewport.handlers.get(type)?.(e);
+    if (type === "pointerup" || type === "pointercancel") captureOwner = pendingCapture = null;
     return e;
   }
-  return { event, hint, panel, viewport, target: kind => new Element(kind),
-    opened: () => opened, returned: () => returned, select: value => { selected = value; },
+  return { event, hint, panel, viewport, captures, target: (kind, parent = viewport) => {
+    const element = new Element(kind); element.parentElement = parent; return element;
+  }, opened: () => opened, returned: () => returned, select: value => { selected = value; },
     cleanup, frames };
+
 }
 
 test("touch swipe opens synchronously on release, shows feedback, and never moves the panel", () => {
@@ -116,7 +150,7 @@ test("fast swipe needs minimum travel and a recent velocity", () => {
 });
 
 test("pointer cancellation and a second finger cancel opening and hide feedback", () => {
-  for (const cancel of [r => r.event("pointercancel", 180), r => r.event("lostpointercapture", 180), r => r.event("pointerdown", 150, 310, { pointerId: 2, isPrimary: false })]) {
+  for (const cancel of [r => r.event("pointercancel", 180), r => r.event("lostpointercapture", 180, 300, { target: r.viewport }), r => r.event("pointerdown", 150, 310, { pointerId: 2, isPrimary: false })]) {
     const r = reader();
     r.event("pointerdown", 300);
     r.event("pointermove", 180);
@@ -146,8 +180,8 @@ test("vertical and diagonal gestures retain native scrolling", () => {
   }
 });
 
-test("links, controls, editors and code blocks do not trigger original article navigation", () => {
-  for (const kind of ["link", "button", "input", "editable", "code"]) {
+test("controls, editors and overflowing code blocks do not trigger navigation", () => {
+  for (const kind of ["button", "input", "editable", "code"]) {
     const r = reader();
     const target = r.target(kind);
     target.scrollWidth = 1000;
@@ -203,4 +237,113 @@ test("cleanup removes handlers and any in-progress external feedback", () => {
   r.cleanup();
   assert.equal(r.viewport.handlers.size, 0);
   assert.ok(!r.hint.attrs.has("data-visible"));
+});
+
+test("implicit capture transfer from a paragraph or image does not cancel either swipe", () => {
+  for (const kind of ["paragraph", "image"]) for (const direction of [-1, 1]) {
+    const r = reader();
+    const target = r.target(kind);
+    r.event("pointerdown", 200, 300, { target });
+    r.event("pointermove", 200 + direction * 20, 300, { target });
+    r.event("pointermove", 200 + direction * 110, 300, { target });
+    assert.ok(r.captures.includes(target), "simulate descendant lostpointercapture during transfer");
+    r.event("pointerup", 200 + direction * 110, 300, { target });
+    while (r.frames.length) r.frames.shift()();
+    assert.equal(r.opened(), direction < 0 ? 1 : 0, kind);
+    assert.equal(r.returned(), direction > 0 ? 1 : 0, kind);
+  }
+});
+
+test("links, linked images and short code support both navigation directions", () => {
+  for (const kind of ["link", "linked-image", "code"]) for (const direction of [-1, 1]) {
+    const r = reader();
+    const target = kind === "linked-image" ? r.target("image", r.target("link")) : r.target(kind);
+    r.event("pointerdown", 200, 300, { target });
+    r.event("pointermove", 200 + direction * 110, 300, { target });
+    r.event("pointerup", 200 + direction * 110, 300, { target });
+    while (r.frames.length) r.frames.shift()();
+    assert.equal(r.opened(), direction < 0 ? 1 : 0, kind);
+    assert.equal(r.returned(), direction > 0 ? 1 : 0, kind);
+    const click = r.event("click", 200 + direction * 110, 300, { target });
+    assert.ok(click.prevented && click.stopped, "the swipe must not also activate the content link");
+  }
+});
+
+test("ordinary link taps, keyboard activation and fresh taps after a swipe still work", () => {
+  const r = reader();
+  const target = r.target("link");
+  r.event("pointerdown", 300, 300, { target });
+  r.event("pointerup", 300, 300, { target });
+  assert.ok(!r.event("click", 300, 300, { target }).prevented);
+  r.event("pointerdown", 300, 300, { target });
+  r.event("pointermove", 180, 300, { target });
+  r.event("pointerup", 180, 300, { target });
+  assert.ok(!r.event("click", 0, 0, { target, detail: 0, pointerType: "", elapsed: 1 }).prevented);
+  r.event("pointerdown", 300, 300, { target, elapsed: 1 });
+  r.event("pointerup", 300, 300, { target, elapsed: 1 });
+  assert.ok(!r.event("click", 300, 300, { target, elapsed: 1 }).prevented);
+});
+
+test("horizontal containers retain the whole gesture at either scroll boundary", () => {
+  for (const kind of ["code", "scroller"]) for (const direction of [-1, 1]) {
+    const r = reader();
+    const container = r.target(kind);
+    container.scrollWidth = 1000;
+    container.scrollLeft = direction < 0 ? 610 : 0;
+    const child = r.target("image", container);
+    r.event("pointerdown", 200, 300, { target: child });
+    r.event("pointermove", 200 + direction * 20, 300, { target: child });
+    r.event("pointermove", 200 + direction * 120, 300, { target: child });
+    assert.equal(container.scrollLeft, direction < 0 ? 610 : 0);
+    r.event("pointerup", 200 + direction * 120, 300, { target: child });
+    assert.equal(r.opened(), 0);
+    assert.equal(r.returned(), 0);
+    assert.ok(!r.hint.attrs.has("data-visible"));
+  }
+});
+
+test("overflow hidden images and containers with no horizontal overflow remain swipeable", () => {
+  for (const config of [{ width: 1000, overflow: "hidden" }, { width: 390, overflow: "auto" }]) {
+    const r = reader();
+    const target = r.target("scroller");
+    target.scrollWidth = config.width;
+    target.overflowX = config.overflow;
+    r.event("pointerdown", 300, 300, { target });
+    r.event("pointermove", 180, 300, { target });
+    r.event("pointerup", 180, 300, { target });
+    assert.equal(r.opened(), 1);
+  }
+});
+
+test("selection starting during a swipe cancels both directions", () => {
+  for (const direction of [-1, 1]) {
+    const r = reader();
+    r.event("pointerdown", 200);
+    r.event("pointermove", 200 + direction * 20);
+    r.select(true);
+    r.event("pointermove", 200 + direction * 120);
+    r.event("pointerup", 200 + direction * 120);
+    while (r.frames.length) r.frames.shift()();
+    assert.equal(r.opened(), 0);
+    assert.equal(r.returned(), 0);
+  }
+});
+
+test("actual viewport capture loss cancels right-swipe return", () => {
+  const r = reader();
+  r.event("pointerdown", 100);
+  r.event("pointermove", 220);
+  r.event("lostpointercapture", 220, 300, { target: r.viewport });
+  r.event("pointerup", 220);
+  while (r.frames.length) r.frames.shift()();
+  assert.equal(r.returned(), 0);
+});
+
+test("horizontal wheel scrolling in nested scroll containers does not return to the list", () => {
+  const r = reader();
+  const container = r.target("scroller");
+  container.scrollWidth = 1000;
+  const child = r.target("image", container);
+  assert.ok(!r.event("wheel", 0, 0, { target: child, deltaX: -200, deltaY: 0 }).prevented);
+  assert.equal(r.returned(), 0);
 });
