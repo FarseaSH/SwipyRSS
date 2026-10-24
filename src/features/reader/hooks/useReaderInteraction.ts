@@ -69,7 +69,6 @@ export function useReaderInteraction(
   keyboardEnabled = true,
   sideToolbar = false,
   onSwipeLeft?: () => void,
-  swipeLeftHintRef?: RefObject<HTMLDivElement | null>,
 ) {
   const [toolbarDimmed, setToolbarDimmed] = useState(sideToolbar);
   const animationRef = useRef<number | null>(null);
@@ -371,11 +370,6 @@ export function useReaderInteraction(
 
     // Part 3: native mobile vertical scrolling, double-tap positioning, and horizontal return.
     // 第三部分：移动端原生纵向滚动、双击定位和横向返回。
-    const hideExternalHint = () => {
-      swipeLeftHintRef?.current?.removeAttribute("data-visible");
-      swipeLeftHintRef?.current?.removeAttribute("data-ready");
-    };
-
     // Require actual travel even for a flick; a paused or reversed swipe must not open a tab.
     // 快滑仍需足够位移；停顿或反向回拖后不能误开原文。
     const acceptsExternalSwipe = (distance: number, now: number) => distance >= 84
@@ -387,7 +381,6 @@ export function useReaderInteraction(
       pointerScrollTarget = null;
       touchTapEligible = false;
       externalSwipeEligible = false;
-      hideExternalHint();
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -460,16 +453,7 @@ export function useReaderInteraction(
       horizontalVelocity = (event.clientX - pointerLastX) / Math.max(1, now - pointerLastTime);
       pointerLastX = event.clientX;
       pointerLastTime = now;
-      if (pointerAxis === "external") {
-        const hint = swipeLeftHintRef?.current;
-        const distance = Math.max(0, -dx);
-        if (hint) {
-          hint.style.setProperty("--swipe-progress", String(Math.min(1, distance / 84)));
-          hint.toggleAttribute("data-visible", distance > 0);
-          hint.toggleAttribute("data-ready", acceptsExternalSwipe(distance, now));
-        }
-        return;
-      }
+      if (pointerAxis === "external") return;
       const panel = panelRef.current;
       if (panel) {
         const offset = Math.max(0, Math.min(viewport.clientWidth, dx));
@@ -653,7 +637,6 @@ export function useReaderInteraction(
       window.clearTimeout(trackpadIdleTimer);
       window.cancelAnimationFrame(swipeSettleFrame);
       clearPanelMotion();
-      hideExternalHint();
       viewport.removeEventListener("pointerdown", onPointerDown);
       viewport.removeEventListener("pointermove", onPointerMove);
       viewport.removeEventListener("pointerup", onPointerEnd);
@@ -665,7 +648,7 @@ export function useReaderInteraction(
       viewport.removeEventListener("keydown", onKeyDown);
       viewport.removeEventListener("scroll", onScroll);
     };
-  }, [continuityMarkerRef, hideContinuityMarker, hidePositionMarker, keyboardEnabled, sideToolbar, onKeyboardBack, onSwipeRight, onSwipeLeft, swipeLeftHintRef, panelRef, positionMarkerRef, setDimmed, stopAnimation, viewportRef]);
+  }, [continuityMarkerRef, hideContinuityMarker, hidePositionMarker, keyboardEnabled, sideToolbar, onKeyboardBack, onSwipeRight, onSwipeLeft, panelRef, positionMarkerRef, setDimmed, stopAnimation, viewportRef]);
 
   const resetToolbar = useCallback(() => {
     wakeToolbar();

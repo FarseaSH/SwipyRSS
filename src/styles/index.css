@@ -406,11 +406,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 
 .reader-viewport { position: relative; height: 100dvh; overflow-y: auto; outline: none; touch-action: pan-y; overscroll-behavior: contain; }
 .reader-panel { position: absolute; inset: 0; z-index: 40; min-width: 0; overflow: hidden; background: var(--color-panel); transform: translate3d(100%,0,0); transition: transform 360ms cubic-bezier(.22,.61,.36,1); will-change: transform; pointer-events: none; }
-.reader-external-swipe-hint { position: absolute; z-index: 37; top: 50%; right: max(14px,env(safe-area-inset-right)); display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-accent-100); border-radius: 999px; padding: 12px 16px; background: var(--color-panel); color: var(--color-accent-700); box-shadow: 0 4px 20px #243c5a14; font-size: 13px; font-weight: 600; pointer-events: none; opacity: 0; transform: translate3d(12px,-50%,0); transition: opacity 160ms ease, transform 200ms ease, background-color 160ms ease; }
-.reader-external-swipe-hint[data-visible] { opacity: calc(.35 + var(--swipe-progress,0) * .65); transform: translate3d(0,-50%,0); }
-.reader-external-swipe-hint[data-ready] { background: var(--color-accent-50); }
-.reader-external-swipe-ready, .reader-external-swipe-hint[data-ready] .reader-external-swipe-prompt { display: none; }
-.reader-external-swipe-hint[data-ready] .reader-external-swipe-ready { display: inline; }
 .reader-panel.open { transform: translate3d(0,0,0); pointer-events: auto; }
 .reader-panel.obscured > .reader-back-button,
 .reader-panel.obscured > .reader-article-nav { visibility: hidden; }
@@ -532,7 +527,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 
 @media (prefers-reduced-motion: reduce) {
   button.touch-pressed, a.touch-pressed,
-  .reader-external-swipe-hint, .reader-panel, .reader-back-button, .reader-article-nav-button, .reader-toolbar, .reader-tool, .reader-tool-label, .position-marker, .floating-switch, .floating-switch-option, .floating-switch-label, .floating-switch-notice, .article-source-notice, .article-star-button::before, .reader-star-icon, .reader-star-icon::before { transition-duration: 1ms; }
+  .reader-panel, .reader-back-button, .reader-article-nav-button, .reader-toolbar, .reader-tool, .reader-tool-label, .position-marker, .floating-switch, .floating-switch-option, .floating-switch-label, .floating-switch-notice, .article-source-notice, .article-star-button::before, .reader-star-icon, .reader-star-icon::before { transition-duration: 1ms; }
   .mark-read-confirm-popover { animation-duration: 1ms; }
 }
 

@@ -56,7 +56,6 @@ function reader({ enabled = true, hasUrl = true } = {}) {
   }
   const viewport = new Element();
   const panel = new Element();
-  const hint = new Element();
   const effects = [];
   const exports = {};
   const browser = {
@@ -78,7 +77,7 @@ function reader({ enabled = true, hasUrl = true } = {}) {
   const ref = current => ({ current });
   exports.useReaderInteraction(ref(viewport), ref(new Element()), ref(new Element()), ref(panel),
     () => { returned += 1; }, undefined, enabled, false,
-    hasUrl ? () => { opened += 1; } : undefined, ref(hint));
+    hasUrl ? () => { opened += 1; } : undefined);
   cleanup = effects[0]();
   const target = new Element();
   target.parentElement = viewport;
@@ -105,26 +104,22 @@ function reader({ enabled = true, hasUrl = true } = {}) {
     if (type === "pointerup" || type === "pointercancel") captureOwner = pendingCapture = null;
     return e;
   }
-  return { event, hint, panel, viewport, captures, target: (kind, parent = viewport) => {
+  return { event, panel, viewport, captures, target: (kind, parent = viewport) => {
     const element = new Element(kind); element.parentElement = parent; return element;
   }, opened: () => opened, returned: () => returned, select: value => { selected = value; },
     cleanup, frames };
 
 }
 
-test("touch swipe opens synchronously on release, shows feedback, and never moves the panel", () => {
+test("touch swipe opens synchronously on release and never moves the panel", () => {
   const r = reader();
   r.event("pointerdown", 300);
   r.event("pointermove", 250);
-  assert.ok(r.hint.attrs.has("data-visible"));
-  assert.ok(!r.hint.attrs.has("data-ready"));
   r.event("pointermove", 200);
-  assert.ok(r.hint.attrs.has("data-ready"));
   assert.equal(r.panel.style.transform, undefined);
   assert.equal(r.opened(), 0);
   r.event("pointerup", 200);
   assert.equal(r.opened(), 1);
-  assert.ok(!r.hint.attrs.has("data-visible"));
   r.event("pointerup", 200);
   assert.equal(r.opened(), 1);
 });
@@ -149,7 +144,7 @@ test("fast swipe needs minimum travel and a recent velocity", () => {
   }
 });
 
-test("pointer cancellation and a second finger cancel opening and hide feedback", () => {
+test("pointer cancellation and a second finger cancel opening", () => {
   for (const cancel of [r => r.event("pointercancel", 180), r => r.event("lostpointercapture", 180, 300, { target: r.viewport }), r => r.event("pointerdown", 150, 310, { pointerId: 2, isPrimary: false })]) {
     const r = reader();
     r.event("pointerdown", 300);
@@ -157,7 +152,6 @@ test("pointer cancellation and a second finger cancel opening and hide feedback"
     cancel(r);
     r.event("pointerup", 180);
     assert.equal(r.opened(), 0);
-    assert.ok(!r.hint.attrs.has("data-visible"));
   }
 });
 
@@ -215,7 +209,6 @@ test("missing URL, inactive reader and text selections disable opening", () => {
     if (config.selectAfterMove) r.select(true);
     r.event("pointerup", 180);
     assert.equal(r.opened(), 0);
-    assert.ok(!r.hint.attrs.has("data-visible"));
   }
 });
 
@@ -230,13 +223,12 @@ test("existing right-swipe return still follows the finger and returns", () => {
   assert.equal(r.opened(), 0);
 });
 
-test("cleanup removes handlers and any in-progress external feedback", () => {
+test("cleanup removes handlers", () => {
   const r = reader();
   r.event("pointerdown", 300);
   r.event("pointermove", 180);
   r.cleanup();
   assert.equal(r.viewport.handlers.size, 0);
-  assert.ok(!r.hint.attrs.has("data-visible"));
 });
 
 test("implicit capture transfer from a paragraph or image does not cancel either swipe", () => {
@@ -298,7 +290,6 @@ test("horizontal containers retain the whole gesture at either scroll boundary",
     r.event("pointerup", 200 + direction * 120, 300, { target: child });
     assert.equal(r.opened(), 0);
     assert.equal(r.returned(), 0);
-    assert.ok(!r.hint.attrs.has("data-visible"));
   }
 });
 

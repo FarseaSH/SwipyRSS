@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, ExternalLink, Share2, Star, UserRound } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Share2, Star, UserRound } from "lucide-react";
 import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from "react";
 import { useSideToolbarDismiss } from "@/components/useSideToolbarDismiss";
@@ -45,7 +45,6 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
   const viewportRef = useRef<HTMLDivElement>(null);
   const continuityMarkerRef = useRef<HTMLDivElement>(null);
   const positionMarkerRef = useRef<HTMLDivElement>(null);
-  const swipeLeftHintRef = useRef<HTMLDivElement>(null);
   const originalArticleUrl = useMemo(
     () => normalizeExternalHttpUrl(article.articleUrl),
     [article.articleUrl],
@@ -63,7 +62,6 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
     open && !obscured,
     toolbarPosition !== "bottom",
     originalArticleUrl ? openOriginalArticle : undefined,
-    swipeLeftHintRef,
   );
   useSideToolbarDismiss(toolbarRef, open && !obscured && toolbarPosition !== "bottom" && !toolbarDimmed, collapseToolbar);
   const sanitizedContent = useMemo(
@@ -237,12 +235,6 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
             <div className="reader-html" onClick={openContentLink} dangerouslySetInnerHTML={{ __html: sanitizedContent }}/>
           </div>
         </article>
-      </div>
-
-      <div ref={swipeLeftHintRef} className="reader-external-swipe-hint" aria-hidden="true">
-        <ExternalLink size={18}/>
-        <span className="reader-external-swipe-prompt">左滑打开原文</span>
-        <span className="reader-external-swipe-ready">松开打开原文</span>
       </div>
 
       <ToolbarAnchor position={toolbarPosition}>
