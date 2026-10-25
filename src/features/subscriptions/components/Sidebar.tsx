@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, CircleDot, Inbox, Rss, Settings, Star, TriangleAlert, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { SidebarFeedList } from "./SidebarFeedList";
-import { secondRowScrollTop } from "./sidebarScroll";
+import { secondRowScrollTop, sidebarScrollDuration, sidebarMotionProgress } from "./sidebarScroll";
 import { UnreadCountBadge } from "@/components/UnreadCountBadge";
 import type { ArticleMode, Feed, FeedFolder } from "@/types";
 
@@ -42,6 +42,8 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
   const pendingSelectionRef = useRef(false);
   const initializedFoldersRef = useRef(folders.length > 0);
   const positioningFrameRef = useRef(0);
+  const interactionRef = useRef(0);
+  const releaseTreeRef = useRef<(() => void) | null>(null);
   const readySelectionRef = useRef<string | null>(null);
   const previousOpenRef = useRef(open);
   const exclusiveFolderRef = useRef<string | null>(null);
@@ -76,72 +78,112 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
     const mobile = !window.matchMedia("(min-width: 1024px)").matches;
     let cancelled = false;
 
-    const position = () => {
-      if (cancelled || !pendingSelectionRef.current) return;
+    const interaction = interactionRef.current;
+    const current = () => !cancelled && pendingSelectionRef.current && interaction === interactionRef.current;
+    const treeAnimations = () => area.getAnimations({ subtree: true }).filter((animation) => {
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      return target instanceof Element && target.matches(".sidebar-feed-collapse, .sidebar-feed-list");
+    });
+    const instant = mobile || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const position = async () => {
+      if (!current()) return;
+      readySelectionRef.current = selectionKey;
       const folder = selectedFeedId
         ? folders.find((candidate) => candidate.id === selectedFolderId && candidate.feedIds.includes(selectedFeedId))
           ?? folders.find((candidate) => candidate.feedIds.includes(selectedFeedId))
         : folders.find((candidate) => candidate.id === selectedFolderId);
       if (!folder) return;
-      readySelectionRef.current = selectionKey;
-      // Defer tree expansion/collapse too: changing its height while the drawer closes
-      // would still make the visible rows jump, even with scroll placement deferred.
-      const exclusive = exclusiveFolderRef.current;
-      exclusiveFolderRef.current = null;
-      if (!expandedFolderIds.has(folder.id) || (exclusive && (expandedFolderIds.size !== 1 || !expandedFolderIds.has(exclusive)))) {
-        setExpandedFolderIds(new Set([exclusive ?? folder.id]));
+      // Close the old group and open the new one in the same commit.
+      const exclusive = exclusiveFolderRef.current || !expandedFolderIds.has(folder.id);
+      if (!expandedFolderIds.has(folder.id) || (exclusive && expandedFolderIds.size !== 1)) {
+        setExpandedFolderIds(new Set(exclusive ? [folder.id] : [...expandedFolderIds, folder.id]));
         return;
       }
+      // Pause real height transitions, sample their final layout once, then drive
+      // their timeline and the scroll from the same frame clock.
+      const motions = treeAnimations().map((animation) => {
+        const start = Number(animation.currentTime ?? 0);
+        const end = Number(animation.effect?.getComputedTiming().endTime ?? start);
+        animation.pause();
+        return { animation, start, end };
+      });
+      releaseTreeRef.current = () => {
+        for (const { animation } of motions) {
+          if (animation.playState === "paused") animation.play();
+        }
+      };
+      const outerStart = area.scrollTop;
+      for (const { animation, end } of motions) animation.currentTime = end;
       const group = Array.from(area.querySelectorAll<HTMLElement>("[data-folder-id]")).find((element) => element.dataset.folderId === folder.id);
       if (!group) return;
-      pendingSelectionRef.current = false;
-      if (mobile) {
-        // Hidden placement is immediate. Also settle before the first paint if a quick
-        // reopen interrupted closing, so there is no visible replay of the scroll.
-        for (const animation of area.getAnimations({ subtree: true })) {
-          const target = (animation.effect as KeyframeEffect | null)?.target;
-          if (target instanceof Element && target.matches(".sidebar-feed-collapse, .sidebar-feed-list")) animation.finish();
-        }
-      }
+      const row = group.querySelector<HTMLElement>(".sidebar-folder-row")!;
+      const viewport = group.querySelector<HTMLElement>(".sidebar-feed-viewport");
+      const activeFeed = Array.from(group.querySelectorAll<HTMLElement>("[data-feed-id]")).find((feed) => feed.dataset.feedId === selectedFeedId);
+      const innerStart = viewport?.scrollTop ?? 0;
+      const innerEnd = viewport && activeFeed
+        ? secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + innerStart, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight)
+        : innerStart;
+      const outerEnd = secondRowScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + outerStart, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
+      for (const { animation, start } of motions) animation.currentTime = start;
+      area.scrollTop = outerStart;
       const started = performance.now();
-      const duration = mobile || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260;
+      const distance = Math.max(Math.abs(outerEnd - outerStart), Math.abs(innerEnd - innerStart));
+      const duration = instant ? 0 : Math.max(motions.length ? 200 : 0, sidebarScrollDuration(distance));
       const place = () => {
-        if (cancelled) return;
-        const row = group.querySelector<HTMLElement>(".sidebar-folder-row")!;
-        const viewport = group.querySelector<HTMLElement>(".sidebar-feed-viewport");
-        const activeFeed = Array.from(group.querySelectorAll<HTMLElement>("[data-feed-id]")).find((feed) => feed.dataset.feedId === selectedFeedId);
-        if (viewport && activeFeed) {
-          viewport.scrollTop = secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight);
+        if (!current()) return;
+        const progress = duration ? Math.min(1, (performance.now() - started) / duration) : 1;
+        const eased = sidebarMotionProgress(progress);
+        for (const { animation, start, end } of motions) {
+          animation.currentTime = start + (end - start) * progress;
         }
-        area.scrollTop = secondRowScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
-        if (performance.now() - started < duration) positioningFrameRef.current = requestAnimationFrame(place);
+        area.scrollTop = outerStart + (outerEnd - outerStart) * eased;
+        if (viewport) viewport.scrollTop = innerStart + (innerEnd - innerStart) * eased;
+        if (progress < 1) positioningFrameRef.current = requestAnimationFrame(place);
+        else {
+          for (const { animation } of motions) animation.finish();
+          releaseTreeRef.current = null;
+          pendingSelectionRef.current = false;
+          exclusiveFolderRef.current = null;
+        }
       };
       place();
     };
 
-    if (mobile && readySelectionRef.current !== selectionKey) {
-      if (open && !reopening) return;
-      // getAnimations forces style resolution and observes the actual drawer transition,
-      // including zero-duration/reduced-motion cases, rather than guessing a timeout.
+    if (mobile) {
+      if (open && !reopening && readySelectionRef.current !== selectionKey) return;
       const closing = open ? [] : drawer.getAnimations().filter((animation) => animation.playState !== "finished");
       if (closing.length) {
         void Promise.allSettled(closing.map((animation) => animation.finished)).then(() => {
-          if (!cancelled) position();
+          if (current()) void position();
         });
-      } else position();
-    } else position();
-    return () => { cancelled = true; cancelAnimationFrame(positioningFrameRef.current); };
+      } else void position();
+    } else void position();
+    return () => { cancelled = true; cancelAnimationFrame(positioningFrameRef.current); releaseTreeRef.current?.(); releaseTreeRef.current = null; };
   }, [open, selectionKey, expandedFolderIds, folders, feeds, selectedFolderId, selectedFeedId, drawerRef]);
 
   useLayoutEffect(() => {
     const area = scrollAreaRef.current;
-    const cancel = () => { cancelAnimationFrame(positioningFrameRef.current); pendingSelectionRef.current = false; exclusiveFolderRef.current = null; };
+    const cancel = (event?: Event) => {
+      // Repeated activation of the current item leaves its in-flight sequence alone.
+      const activation = event?.type === "pointerdown" || (event?.type === "keydown" && ["Enter", " "].includes((event as KeyboardEvent).key));
+      if (activation && event?.target instanceof Element
+        && event.target.closest('.sidebar-folder-link[aria-current="page"], .sidebar-feed-item[aria-current="page"]')) return;
+      releaseTreeRef.current?.();
+      releaseTreeRef.current = null;
+      interactionRef.current += 1;
+      cancelAnimationFrame(positioningFrameRef.current);
+      pendingSelectionRef.current = false;
+      exclusiveFolderRef.current = null;
+    };
     area?.addEventListener("wheel", cancel, { passive: true });
+    area?.addEventListener("touchmove", cancel, { passive: true });
     area?.addEventListener("pointerdown", cancel, true);
     area?.addEventListener("keydown", cancel, true);
     return () => {
       cancel();
       area?.removeEventListener("wheel", cancel);
+      area?.removeEventListener("touchmove", cancel);
       area?.removeEventListener("pointerdown", cancel, true);
       area?.removeEventListener("keydown", cancel, true);
     };
@@ -151,10 +193,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
   const select = (next: ArticleMode) => { onSelectMode(next); onClose(); };
   const selectStarred = () => { onSelectStarred(); onClose(); };
   const selectFolder = (folderId: string) => {
-    exclusiveFolderRef.current = folderId;
-    pendingSelectionRef.current = true;
-    readySelectionRef.current = null;
-    if (window.matchMedia("(min-width: 1024px)").matches) setExpandedFolderIds(new Set([folderId]));
+    if (selectionKey !== `folder:${folderId}`) exclusiveFolderRef.current = folderId;
     onSelectFolder(folderId);
     onClose();
   };

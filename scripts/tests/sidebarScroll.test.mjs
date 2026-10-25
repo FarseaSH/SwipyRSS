@@ -7,12 +7,12 @@ import ts from "typescript";
 const source = readFileSync(new URL("../../src/features/subscriptions/components/sidebarScroll.ts", import.meta.url), "utf8");
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports });
-const { secondRowScrollTop, scrollbarGeometry } = exports;
+const { secondRowScrollTop, sidebarScrollDuration, scrollbarGeometry } = exports;
 
-test("selected feeds retain one preceding row, without blank space at either boundary", () => {
+test("second-row alignment stays within the real scroll range", () => {
+  assert.equal(secondRowScrollTop(216, 36, 396, 180), 180);
   assert.equal(secondRowScrollTop(0, 36, 396, 180), 0);
-  assert.equal(secondRowScrollTop(216, 36, 396, 180), 180); // seventh item is second
-  assert.equal(secondRowScrollTop(360, 36, 396, 180), 216); // last item stays at bottom
+  assert.equal(secondRowScrollTop(360, 36, 396, 180), 216);
   assert.equal(secondRowScrollTop(36, 36, 72, 180), 0);
 });
 
@@ -36,4 +36,13 @@ test("five or fewer feeds have no scroll range, including zero-height empty list
     assert.equal(geometry.travel, 0);
     assert.ok(Number.isFinite(geometry.thumbHeight));
   }
+});
+
+
+test("scroll duration grows with distance without an upper time cap", () => {
+  assert.equal(sidebarScrollDuration(0), 0);
+  assert.equal(sidebarScrollDuration(100), 280);
+  assert.equal(sidebarScrollDuration(300), 520);
+  assert.equal(sidebarScrollDuration(-300), 520);
+  assert.ok(sidebarScrollDuration(10000) > 10000);
 });

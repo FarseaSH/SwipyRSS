@@ -133,11 +133,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .sidebar-folder-link svg { flex: none; }
 .sidebar-folder-toggle { display: grid; width: 34px; height: 38px; flex: none; place-items: center; border: 0; border-radius: 10px; padding: 0; background: transparent; color: var(--color-muted); cursor: pointer; transition: color 150ms ease, transform 150ms ease; }
 .sidebar-folder-row.active .sidebar-folder-toggle { color: var(--color-accent-700); }
-.sidebar-feed-collapse { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 180ms ease, visibility 0s linear 180ms; }
-.sidebar-feed-collapse.is-expanded { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 240ms ease, visibility 0s; }
+.sidebar-feed-collapse { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 200ms ease, visibility 0s linear 200ms; }
+.sidebar-feed-collapse.is-expanded { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 200ms ease, visibility 0s; }
 .sidebar-feed-collapse-clip { min-height: 0; overflow: hidden; }
-.sidebar-feed-list { position: relative; margin: 3px 0 6px 17px; padding-left: 12px; transform: translateY(-6px); transition: transform 180ms ease; }
-.sidebar-feed-collapse.is-expanded .sidebar-feed-list { transform: translateY(0); transition-duration: 240ms; }
+.sidebar-feed-list { position: relative; margin: 3px 0 6px 17px; padding-left: 12px; }
 .sidebar-feed-list::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: #d5dee9; }
 .sidebar-feed-viewport { max-height: 180px; overflow-y: auto; overscroll-behavior-y: auto; scrollbar-width: none; overflow-anchor: none; }
 .sidebar-feed-viewport::-webkit-scrollbar { display: none; }
