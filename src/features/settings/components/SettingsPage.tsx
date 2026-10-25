@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { ConnectionDefaults } from "@/platform/Platform";
 import { SettingsSelect } from "./SettingsSelect";
 import { SwipeMarkReadSelect } from "./SwipeMarkReadSelect";
+import { VersionSettings } from "@/features/versions/components/VersionControls";
 import type { FreshRssConnectionInput, SavedFreshRssConnection, StartupPageMode, SwipeMarkReadMode, ToolbarPosition } from "@/types";
 
 type Props = {
@@ -81,6 +82,7 @@ export function SettingsPage({ connectionDefaults, connection, configured, start
             </div>
           </section>
 
+          <VersionSettings />
           <section className="settings-card" aria-labelledby="shortcut-settings-title">
             <div className="settings-card-header">
               <div><h3 id="shortcut-settings-title">快捷键</h3><p>查看列表与正文的键盘操作，也可长按 Ctrl 或 ⌘ 查看当前页面的快捷键。</p></div>

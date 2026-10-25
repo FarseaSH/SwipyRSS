@@ -43,6 +43,8 @@ export function getFreshRssExtensionRuntimeConfig(): FreshRssExtensionRuntimeCon
  * FreshRSS Extension 的 Service Worker 只在安全上下文中注册。
  */
 export function registerFreshRssExtensionServiceWorker(): void {
+  // An Extension host manages registration (or intentionally disables it in direct mode).
+  if (document.getElementById("root")?.dataset.loaderManaged === "1") return;
   const config = getFreshRssExtensionRuntimeConfig();
   if (!config || !("serviceWorker" in navigator) || !window.isSecureContext) return;
 

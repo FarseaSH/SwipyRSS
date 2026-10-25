@@ -1,0 +1,110 @@
+name: Publish Test frontend
+run-name: Test frontend from ${{ inputs.source_ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Source branch, tag, or full commit SHA in this repository
+        required: true
+        default: dev
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swipyrss-dist-test
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - name: Resolve source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:package
+      - name: Build standalone frontend package
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.sha }}
+          BUILD_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run build:package -- --channel test --source-commit "$SOURCE_COMMIT" --run-id "$BUILD_RUN"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-web-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release/test/latest.json
+            release/test/swipyrss.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: publisher
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-web-${{ github.run_id }}-${{ github.run_attempt }}
+          path: frontend-artifact
+      - name: Verify artifact before publishing
+        env:
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_sha }}
+        shell: python
+        run: |
+          import hashlib, json, os, pathlib, zipfile
+          directory = pathlib.Path('frontend-artifact')
+          assert sorted(p.name for p in directory.iterdir()) == ['latest.json', 'swipyrss.zip']
+          latest = json.loads((directory / 'latest.json').read_text())
+          archive = directory / 'swipyrss.zip'
+          assert latest['schema'] == 1 and latest['channel'] == 'test'
+          assert latest['sourceCommit'] == os.environ['SOURCE_COMMIT']
+          assert latest.get('sourceDirty') is False
+          assert latest['package']['file'] == 'swipyrss.zip'
+          assert archive.stat().st_size == latest['package']['size'] <= 20 * 1024 * 1024
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == latest['package']['sha256']
+          with zipfile.ZipFile(archive) as z:
+              manifest = json.loads(z.read('build-manifest.json'))
+              for field in ('buildId', 'sourceCommit', 'version', 'channel', 'sourceDirty', 'createdAt'):
+                  assert manifest[field] == latest[field]
+              assert set(z.namelist()) == {'build-manifest.json', *(f['path'] for f in manifest['files'])}
+              assert len(z.infolist()) == len(manifest['files']) + 1
+              for f in manifest['files']:
+                  assert not f['path'].startswith('/') and '..' not in pathlib.PurePosixPath(f['path']).parts
+                  assert pathlib.PurePosixPath(f['path']).suffix in ('.js', '.css', '.png', '.svg', '.jpg', '.jpeg', '.gif')
+                  data = z.read(f['path'])
+                  assert len(data) == f['size']
+                  assert hashlib.sha256(data).hexdigest() == f['sha256']
+      - name: Replace dist-test with one root commit
+        working-directory: publisher
+        env:
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          previous=$(git ls-remote origin refs/heads/dist-test | cut -f1)
+          git switch --orphan dist-test
+          cp ../frontend-artifact/latest.json ../frontend-artifact/swipyrss.zip .
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- latest.json swipyrss.zip
+          git commit -m "Test frontend from $SOURCE_COMMIT"
+          test "$(git rev-list --parents -n 1 HEAD | wc -w | tr -d ' ')" = '1'
+          git push --force-with-lease="refs/heads/dist-test:$previous" origin HEAD:refs/heads/dist-test

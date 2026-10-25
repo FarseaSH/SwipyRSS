@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronRight, CircleDot, Inbox, Rss, Settings, Star, TriangleAlert, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleDot, Inbox, Rss, Star, TriangleAlert, X } from "lucide-react";
+import { VersionControls } from "@/features/versions/components/VersionControls";
 import { useEffect, useState } from "react";
 import { FeedIcon } from "@/components/FeedIcon";
 import { UnreadCountBadge } from "@/components/UnreadCountBadge";
@@ -112,7 +113,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
           </button>
         ) : null}
         <div className="border-t pt-3">
-          <button className={`sidebar-item ${settingsActive ? "active" : ""}`} onClick={openSettings}><Settings size={17}/>设置</button>
+          <VersionControls onSettings={openSettings} active={settingsActive}/>
         </div>
       </div>
     </aside>
