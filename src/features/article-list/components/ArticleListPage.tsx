@@ -15,15 +15,18 @@ import { getReturnAnchor, getReturnVisibleArticleIds } from "../hooks/returnArti
 import { ArticleCard } from "./ArticleCard";
 import { useListDate } from "../hooks/useListDate";
 import { shouldMarkAboveRead } from "../markReadAction";
+import { useArticleShortcutMode } from "../hooks/useArticleShortcutMode";
 
 /**
  * Inputs and interactive controls retain their own keyboard behavior.
  * 输入区域与交互控件保留自身按键行为。
  */
 function isInteractiveShortcutTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest(
+  const control = target instanceof Element ? target.closest(
     "input, textarea, select, [contenteditable], a, button, [role='button'], [data-native-horizontal-scroll]",
-  ));
+  ) : null;
+  // A focused article is still the list; nested controls keep their native behavior.
+  return Boolean(control && !control.matches("article.article-card"));
 }
 
 const EMPTY_PAGE: ArticlePage = {
@@ -908,17 +911,26 @@ export function ArticleListPage(props: Props) {
     }
   };
 
+  const shortcutsBlocked = !props.active || props.autoCollapsePaused || props.sidebarOpen
+    || markReadConfirmationOpen || markingRead || refreshingList;
+  const shortcutScreenKey = JSON.stringify([
+    listKey, props.isStarredList, currentPage, currentPageArticles.slice(0, 9).map((article) => article.id),
+  ]);
+  const { mode: shortcutMode, modeRef: shortcutModeRef, activate: activateShortcutMode, reset: resetShortcutMode }
+    = useArticleShortcutMode(!shortcutsBlocked && pageIsSettled, shortcutScreenKey);
+
   // Track held keys independently; preserve Alt during paging and regrouping, and clear it on page
   // changes or blur.
   // 独立监听按住状态，翻屏重新分组时保留 Alt，切换页面或失焦时清理。
   useEffect(() => {
     const reset = () => setArticleNumbersVisible(false);
     reset();
-    if (!props.active || markReadConfirmationOpen || markingRead) return;
+    if (shortcutsBlocked) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Alt") return;
       if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey || event.shiftKey || event.getModifierState("AltGraph")) return;
       if (isInteractiveShortcutTarget(event.target) || viewportRef.current?.closest("[inert]")) return;
+      resetShortcutMode();
       setArticleNumbersVisible(true);
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -940,10 +952,10 @@ export function ArticleListPage(props: Props) {
       document.removeEventListener("visibilitychange", reset);
       document.removeEventListener("focusin", onFocusIn);
     };
-  }, [props.active, markReadConfirmationOpen, markingRead, listKey]);
+  }, [shortcutsBlocked, listKey, resetShortcutMode]);
 
   useEffect(() => {
-    if (!props.active) return;
+    if (shortcutsBlocked) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey) return;
       if (markReadConfirmationOpen || markingRead || viewportRef.current?.closest("[inert]")) return;
@@ -961,11 +973,25 @@ export function ArticleListPage(props: Props) {
         if (!article) return;
         event.preventDefault();
         setArticleNumbersVisible(false);
-        props.onOpenArticle(article.id);
+        const star = !event.altKey && shortcutModeRef.current === "star";
+        resetShortcutMode();
+        if (star) props.onToggleStar(article.id);
+        else props.onOpenArticle(article.id);
         return;
       }
       if (event.altKey) return;
       const key = event.key.toLowerCase();
+      if (event.key === "Escape" && shortcutModeRef.current !== "none") {
+        event.preventDefault();
+        resetShortcutMode();
+        return;
+      }
+      if (key === "g" || key === "s") {
+        if (!pageIsSettled || !currentPageArticles.length) return;
+        event.preventDefault();
+        activateShortcutMode(key === "g" ? "go" : "star");
+        return;
+      }
       if (["/", "m", "r", "[", "]"].includes(key)) bumpToolbarActivity();
       if (event.key === "/") {
         event.preventDefault();
@@ -999,7 +1025,7 @@ export function ArticleListPage(props: Props) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentPageArticles, markReadConfirmationOpen, markingRead, pageIsSettled, props.active, props.canReopenReader, props.onNextList, props.onOpenArticle, props.onPreviousList, props.onReopenReader, props.selectedFeed, props.mode, props.onModeChange, props.toolbarPosition, listKey, listScopeKey, wakeListToolbar, requestMarkRead, refreshList, bumpToolbarActivity, setSwitchDimmed]);
+  }, [currentPageArticles, markReadConfirmationOpen, markingRead, pageIsSettled, shortcutsBlocked, shortcutModeRef, activateShortcutMode, resetShortcutMode, props.onToggleStar, props.canReopenReader, props.onNextList, props.onOpenArticle, props.onPreviousList, props.onReopenReader, props.selectedFeed, props.mode, props.onModeChange, props.toolbarPosition, listKey, listScopeKey, wakeListToolbar, requestMarkRead, refreshList, bumpToolbarActivity, setSwitchDimmed]);
 
   const hasPreviousGroup = settledPage > 0;
   const hasNextGroup = hasNextPage;
@@ -1095,7 +1121,8 @@ export function ArticleListPage(props: Props) {
                   article={article}
                   feedIconUrl={feedsById.get(article.feedId)?.iconUrl}
                   active={activeArticleIds.has(article.id)}
-                  shortcutNumber={props.active && articleNumbersVisible && pageIsSettled && !markReadConfirmationOpen && !markingRead ? articleShortcutNumbers.get(article.id) : undefined}
+                  shortcutNumber={!shortcutsBlocked && (articleNumbersVisible || shortcutMode === "go") && pageIsSettled ? articleShortcutNumbers.get(article.id) : undefined}
+                  starShortcutNumber={!shortcutsBlocked && !articleNumbersVisible && shortcutMode === "star" && pageIsSettled ? articleShortcutNumbers.get(article.id) : undefined}
                   highlightPhase={readingArticleId === article.id ? "reading"
                     : visibleReturnSelection?.id === article.id ? visibleReturnSelection.phase : "idle"}
                   onHighlightEnd={() => {
