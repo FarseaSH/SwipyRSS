@@ -232,7 +232,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 .article-meta-time { display: inline-flex; flex: none; align-items: center; margin-left: auto; color: var(--article-meta-color); white-space: nowrap; transition: color 160ms ease; }
 .article-card:not(.read) .article-meta-time[data-recency="today"], .article-card:not(.read) .article-meta-time[data-recency="yesterday"] { color: #456286; }
 .article-card:not(.read) .article-meta-time[data-recency="today"] { font-weight: 700; }
-.article-card:not(.read) .article-meta-time[data-recency="yesterday"] { font-weight: 600; }
+.article-card:not(.read) .article-meta-time[data-recency="yesterday"] { font-weight: 400; }
 @media (hover: hover) and (pointer: fine) {
   .list-feed-homepage:hover { color: var(--color-accent-600); }
   .sidebar-item:hover .sidebar-all-icon { color: var(--color-accent-500); }
