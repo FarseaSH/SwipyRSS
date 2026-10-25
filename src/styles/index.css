@@ -136,7 +136,22 @@ button { font: inherit; }
 .sidebar-folder-link svg { flex: none; }
 .sidebar-folder-toggle { display: grid; width: 34px; height: 38px; flex: none; place-items: center; border: 0; border-radius: 10px; padding: 0; background: transparent; color: var(--color-muted); cursor: pointer; transition: color 150ms ease, transform 150ms ease; }
 .sidebar-folder-row.active .sidebar-folder-toggle { color: var(--color-accent-700); }
-.sidebar-feed-list { margin: 0 0 6px 17px; border-left: 1px solid #d5dee9; padding: 3px 0 0 11px; }
+.sidebar-feed-collapse { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 200ms ease, visibility 0s linear 200ms; }
+.sidebar-feed-collapse.is-expanded { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 200ms ease, visibility 0s; }
+.sidebar-feed-collapse-clip { min-height: 0; overflow: hidden; }
+.sidebar-feed-list { position: relative; margin: 3px 0 6px 17px; padding-left: 12px; }
+.sidebar-feed-list::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: #d5dee9; }
+.sidebar-feed-viewport { max-height: 180px; overflow-y: auto; overscroll-behavior-y: auto; scrollbar-width: none; overflow-anchor: none; }
+.sidebar-feed-viewport::-webkit-scrollbar { display: none; }
+.sidebar-feed-content > .sidebar-feed-item { height: 36px; }
+.sidebar-feed-scrollbar { position: absolute; top: 0; bottom: 0; left: -10px; width: 20px; cursor: grab; touch-action: none; user-select: none; }
+.sidebar-feed-scrollbar:active { cursor: grabbing; }
+.sidebar-feed-scrollbar:focus-visible { outline: 2px solid var(--color-accent-600); outline-offset: -4px; border-radius: 10px; }
+.sidebar-feed-thumb { position: absolute; top: 0; left: 8.5px; width: 4px; border-radius: 999px; background: #9baabe; }
+.sidebar-feed-scrollbar:hover .sidebar-feed-thumb, .sidebar-feed-scrollbar:active .sidebar-feed-thumb { background: var(--color-accent-600); }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-feed-collapse, .sidebar-feed-collapse.is-expanded, .sidebar-feed-list, .sidebar-feed-collapse.is-expanded .sidebar-feed-list { transition: none; }
+}
 .sidebar-feed-item { display: flex; width: 100%; min-width: 0; align-items: center; gap: 9px; border: 0; border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--color-muted); font-size: 13px; font-weight: 550; text-align: left; cursor: pointer; transition: color 150ms ease, background-color 150ms ease; }
 .sidebar-feed-item.active { background: var(--color-selected); color: var(--color-accent-700); font-weight: 650; }
 .sidebar-feed-item svg { flex: none; }
@@ -151,7 +166,7 @@ button { font: inherit; }
  * Keep subscription-tree scrolling while hiding visible WebKit and Firefox scrollbars.
  * 保留订阅树滚动能力，但隐藏 WebKit 与 Firefox 的可见滚动条。
  */
-.sidebar-scroll-area { overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; }
+.sidebar-scroll-area { overflow-anchor: none; overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; }
 .sidebar-scroll-area::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .sidebar-api-warning { display: flex; width: 100%; align-items: flex-start; gap: 10px; margin-bottom: 12px; border: 1px solid #efc9d0; border-radius: 14px; padding: 11px 12px; background: #fff1f3; color: #813744; text-align: left; cursor: pointer; box-shadow: 0 4px 14px rgba(133,55,71,.05); transition: border-color 160ms ease,background-color 160ms ease,transform 160ms ease; }
 .sidebar-api-warning:active { transform: scale(.985); }
