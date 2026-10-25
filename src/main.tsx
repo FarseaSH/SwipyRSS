@@ -1,5 +1,6 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
+import { ArticleTimeProvider } from "@/lib/time/ArticleTimeProvider";
 import App from "@/app/App";
 import { platform } from "@platform";
 import "@platform/styles.css";
@@ -12,8 +13,10 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <HostHandshake />
-    <App platform={platform}/>
+    <ArticleTimeProvider>
+      <HostHandshake />
+      <App platform={platform}/>
+    </ArticleTimeProvider>
   </StrictMode>,
 );
 

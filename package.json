@@ -13,7 +13,8 @@
     "dev:extension": "node scripts/serve-extension.mjs",
     "test:package": "node --test scripts/tests/web-package.test.mjs",
     "preview": "vite preview --mode web",
-    "test:platform": "node --test scripts/tests/platform.test.mjs"
+    "test:platform": "node --test scripts/tests/platform.test.mjs",
+    "test:time": "node --test scripts/tests/article-time.test.mjs"
   },
   "dependencies": {
     "dompurify": "^3.2.6",

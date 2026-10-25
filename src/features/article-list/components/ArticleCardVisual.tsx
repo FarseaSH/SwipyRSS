@@ -1,3 +1,4 @@
+import { useArticleTime } from "@/lib/time/ArticleTimeProvider";
 import type { ReactNode, Ref } from "react";
 import { FeedIcon } from "@/components/FeedIcon";
 import type { Article } from "@/types";
@@ -30,7 +31,8 @@ type SourceLabelProps = {
  */
 export function ArticleCardVisual({ listNow, article, titleFitsOneLine, source, readAction, starAction, titleMeasureRef }: VisualProps) {
   const hasSummary = article.summaryText.trim().length > 0;
-  const published = formatListPublishedTime(article.publishedAt, listNow);
+  const { timeZone } = useArticleTime();
+  const published = formatListPublishedTime(article.publishedAt, listNow, timeZone);
 
   return (
     <>

@@ -679,3 +679,22 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-
 [data-touch-feedback-suppressed] :is(button,a):active {
   transform: none;
 }
+
+.timezone-field { flex-wrap: wrap; }
+.timezone-field > p { flex-basis: 100%; margin: 0; color: var(--color-muted); font-size: 12px; }
+.timezone-trigger { max-width: 100%; }
+.timezone-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
+.timezone-dialog { margin: auto; width: min(560px, calc(100vw - 24px)); max-height: min(640px, calc(100dvh - 32px)); padding: 18px; border: 1px solid var(--color-line); border-radius: 20px; background: var(--color-panel); color: var(--color-ink); box-shadow: 0 16px 60px #17253633; }
+.timezone-dialog::backdrop { background: #17253655; }
+.timezone-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.timezone-dialog-header h3 { margin: 0; font-size: 16px; }
+.timezone-search { display: flex; align-items: center; gap: 8px; margin: 14px 0; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 12px; }
+.timezone-search input { width: 100%; min-width: 0; background: transparent; border: 0; outline: none; font-size: 16px; color: inherit; }
+.timezone-search:focus-within { outline: 2px solid var(--color-accent-700); }
+.timezone-options { overflow-y: auto; max-height: min(380px, calc(100dvh - 250px)); }
+.timezone-options button { width: 100%; text-align: left; background: transparent; border: 0; }
+.timezone-options button span { overflow-wrap: anywhere; }
+.timezone-options button:hover, .timezone-options button:focus-visible { background: var(--color-hover); }
+.timezone-options button[aria-pressed="true"] { background: var(--color-selected); color: var(--color-accent-700); }
+.timezone-options svg { flex: none; }
+.timezone-note { margin: 14px 0 0; font-size: 12px; color: var(--color-muted); }

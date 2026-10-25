@@ -339,7 +339,6 @@ function parseArticle(raw: unknown): Article | null {
     feedTitle: stringValue(origin.title) ?? "未知来源",
     feedColor: stableFeedColor(feedId),
     publishedAt,
-    publishedLabel: formatPublishedTime(publishedAt),
     author: stringValue(value.author),
     title,
     summaryText: truncateText(stripHtml(contentHtml), 220),
@@ -373,47 +372,6 @@ function publishedMillis(value: Record<string, unknown>): number {
   if (Number.isFinite(published)) return published * 1_000;
   const timestampUsec = stringValue(value.timestampUsec);
   return timestampUsec ? Math.trunc(Number(timestampUsec) / 1_000) : 0;
-}
-
-/**
- * Refresh relative date labels against today's date even when returning cached articles.
- * 缓存返回时也要按当前日期刷新相对时间文案。
- */
-export function refreshPublishedLabels(page: StreamPage): StreamPage {
-  return { ...page, items: page.items.map((article) => ({ ...article, publishedLabel: formatPublishedTime(article.publishedAt) })) };
-}
-
-function formatPublishedTime(milliseconds: number): string {
-  const timestamp = new Date(milliseconds);
-  if (!Number.isFinite(timestamp.getTime())) return "时间未知";
-  const now = new Date();
-  const time = `${pad(timestamp.getHours())}:${pad(timestamp.getMinutes())}`;
-  const today = localDayNumber(now);
-  const publishedDay = localDayNumber(timestamp);
-  const daysAgo = today - publishedDay;
-  const isPastOrPresent = timestamp.getTime() <= now.getTime();
-  if (isPastOrPresent && daysAgo === 0) return `今天 ${time}`;
-  if (isPastOrPresent && daysAgo === 1) return `昨天 ${time}`;
-  const mondayOffset = (now.getDay() + 6) % 7;
-  const dateLabel = `${pad(timestamp.getMonth() + 1)}-${pad(timestamp.getDate())} ${time}`;
-  if (isPastOrPresent && daysAgo >= 2 && daysAgo <= 6 && daysAgo <= mondayOffset) {
-    return `周${chineseWeekday(timestamp)} ${dateLabel}`;
-  }
-  if (isPastOrPresent && daysAgo >= 2 && daysAgo <= 6) return `上周${chineseWeekday(timestamp)} ${dateLabel}`;
-  if (timestamp.getFullYear() === now.getFullYear()) return dateLabel;
-  return `${timestamp.getFullYear()}-${dateLabel}`;
-}
-
-function localDayNumber(date: Date): number {
-  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
-}
-
-function chineseWeekday(date: Date): string {
-  return ["日", "一", "二", "三", "四", "五", "六"][date.getDay()];
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
 }
 
 function stableFeedColor(feedId: string): string {
