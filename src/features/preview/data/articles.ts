@@ -12,7 +12,10 @@ type PreviewArticleSeed = {
   isStarred: boolean;
 };
 
-const PREVIEW_BASE_TIMESTAMP = Date.now() - 15 * 60 * 1000;
+// Relative dates keep the preview useful on any day. Deliberately out-of-order entries in
+// the first and second batches exercise suffix grouping and the frozen append boundary.
+const PREVIEW_NOW = Date.now();
+const PREVIEW_HOURS_AGO = [0, 26, 1, 2, 4, 5, 7, 10, 25, 28, 0.5, 29, 32, 36, 41, 49, 56, 72, 80, 96, 110, 125, 140, 150, 170, 180, 190, 200, 240, 260];
 
 const blueGrayFeedColors: Record<string, string> = {
   "#438A57": "#3B78B8",
@@ -93,13 +96,14 @@ const previewArticleSeeds: PreviewArticleSeed[] = [
  */
 export const initialArticles: Article[] = previewArticleSeeds.map((seed, index) => {
   const content = buildMockContent(seed.id, seed.title, seed.summary);
+  const publishedAt = PREVIEW_NOW - PREVIEW_HOURS_AGO[index] * 3_600_000;
 
   return {
     id: seed.id,
     feedId: createPreviewFeedId(seed.feed),
     feedTitle: seed.feed,
     feedColor: blueGrayFeedColors[seed.feedColor] ?? "#4f78a3",
-    publishedAt: PREVIEW_BASE_TIMESTAMP - index * index * 43 * 60 * 1000,
+    publishedAt,
     author: mockAuthors[seed.id],
     title: seed.title,
     summaryText: seed.summary,

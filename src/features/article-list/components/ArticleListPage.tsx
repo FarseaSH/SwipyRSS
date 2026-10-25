@@ -13,7 +13,6 @@ import { useListToolbarAutoCollapse } from "../hooks/useListToolbarAutoCollapse"
 import { getArticleTextRects } from "../hooks/articleVisibility";
 import { getReturnAnchor, getReturnVisibleArticleIds } from "../hooks/returnArticlePlacement";
 import { ArticleCard } from "./ArticleCard";
-import { useListDate } from "../hooks/useListDate";
 import { shouldMarkAboveRead } from "../markReadAction";
 import { useArticleShortcutMode } from "../hooks/useArticleShortcutMode";
 
@@ -39,6 +38,8 @@ const EMPTY_PAGE: ArticlePage = {
 
 type Props = {
   articles: Article[];
+  listNow: number;
+  timeSectionLabels: ReadonlyMap<string, string | undefined>;
   feeds: Feed[];
   refreshKey: number;
   mode: ArticleMode;
@@ -123,7 +124,7 @@ function orderFolderFeeds(
  * 文章列表页，负责列表范围导航、翻组和 continuation 加载更多。
  */
 export function ArticleListPage(props: Props) {
-  const listNow = useListDate();
+  const listNow = props.listNow;
   const markAboveRead = shouldMarkAboveRead(props.mode, props.swipeMarkReadMode);
   const feedHomepage = useMemo(() => {
     if (props.isStarredList || !props.selectedFeed?.siteUrl) return undefined;
@@ -1117,6 +1118,7 @@ export function ArticleListPage(props: Props) {
               {props.articles.map((article) => (
                 <ArticleCard
                   listNow={listNow}
+                  timeSectionLabel={props.timeSectionLabels.get(article.id)}
                   key={article.id}
                   article={article}
                   feedIconUrl={feedsById.get(article.feedId)?.iconUrl}

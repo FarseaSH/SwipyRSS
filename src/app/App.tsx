@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useArticleTimeSections } from "@/features/article-list/hooks/useArticleTimeSections";
+import { useListDate } from "@/features/article-list/hooks/useListDate";
 import { ArticleListPage } from "@/features/article-list/components/ArticleListPage";
 import { articleMatchesPreviewScope, getScopeKey, getStreamId, type ListScope } from "@/features/article-list/scope";
 import { ConnectPage } from "@/features/connection/components/ConnectPage";
+import { getPreviewArticlePage } from "@/features/preview/data/pagination";
 import { initialArticles } from "@/features/preview/data/articles";
 import { feedFolders as previewFolders, previewFeeds } from "@/features/preview/data/feedFolders";
 import { ReaderPage } from "@/features/reader/components/ReaderPage";
@@ -308,6 +311,14 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [loadingList, setLoadingList] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [articleListRevision, setArticleListRevision] = useState(0);
+  const listNow = useListDate();
+  const timeSectionLabels = useArticleTimeSections(articles, articleListRevision, listNow);
+  // Reset only after a successful replacement; failed refreshes keep the frozen timeline.
+  const replaceArticleList = useCallback((items: Article[]) => {
+    setArticles(items);
+    setArticleListRevision((revision) => revision + 1);
+  }, []);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [folders, setFolders] = useState<FeedFolder[]>([]);
   const [readingListUnreadCount, setReadingListUnreadCount] = useState(0);
@@ -372,6 +383,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const previewArticlesRef = useRef(
     new Map(initialArticles.map((article) => [article.id, { ...article }])),
   );
+  // Keep the preview cursor stable when articles are marked read before loading the next batch.
+  const previewListArticlesRef = useRef<Article[]>([]);
   const feedReadActivityStorageKey = useMemo(
     () => getFeedReadActivityStorageKey(connection, previewMode),
     [connection, previewMode],
@@ -643,10 +656,12 @@ export default function App({ platform }: { platform: AppPlatform }) {
     const visibleArticles = previewArticles
       .filter((article) => articleMatchesPreviewScope(article, nextScope, previewFolders))
       .filter((article) => nextMode === "all" || !article.isRead);
-    setArticles(visibleArticles);
-    setContinuation(undefined);
-    return visibleArticles;
-  }, []);
+    previewListArticlesRef.current = visibleArticles;
+    const page = getPreviewArticlePage(visibleArticles);
+    replaceArticleList(page.items);
+    setContinuation(page.continuation);
+    return page.items;
+  }, [replaceArticleList]);
 
   /**
    * Fetch a complete new scope through the current RSS adapter. Sequence checks prevent slow
@@ -672,7 +687,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       });
       if (sequence !== requestSequenceRef.current) return;
 
-      setArticles(page.items);
+      replaceArticleList(page.items);
       setContinuation(page.continuation);
       setSelectedId(page.items[0]?.id ?? null);
     } catch (error) {
@@ -680,7 +695,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } finally {
       if (sequence === requestSequenceRef.current) setLoadingList(false);
     }
-  }, [notify, rssClient]);
+  }, [notify, rssClient, replaceArticleList]);
 
   /**
    * Close the reader when switching scopes and choose the preview or live data source.
@@ -738,7 +753,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       setFolders(bootstrap.folders);
       setReadingListUnreadCount(bootstrap.readingListUnreadCount);
       setFeedUnreadCounts(createFeedUnreadCounts(bootstrap.feeds));
-      setArticles(firstPage.items);
+      replaceArticleList(firstPage.items);
       setContinuation(firstPage.continuation);
       setSelectedId(firstPage.items[0]?.id ?? null);
       setScope(startupScope);
@@ -749,7 +764,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } catch (error) {
       throw new Error(normalizeRssError(error).message);
     }
-  }, [beginReadingSession, notify, rssClient]);
+  }, [beginReadingSession, notify, rssClient, replaceArticleList]);
 
   /**
    * Load mock data through the standard DTOs so both browsers and native shells can enter preview
@@ -777,15 +792,17 @@ export default function App({ platform }: { platform: AppPlatform }) {
     const visibleArticles = previewArticles
       .filter((article) => articleMatchesPreviewScope(article, startupScope, previewFolders))
       .filter((article) => restoredMode === "all" || !article.isRead);
-    setArticles(visibleArticles);
-    setSelectedId(visibleArticles[0]?.id ?? null);
-    setContinuation(undefined);
+    previewListArticlesRef.current = visibleArticles;
+    const page = getPreviewArticlePage(visibleArticles);
+    replaceArticleList(page.items);
+    setSelectedId(page.items[0]?.id ?? null);
+    setContinuation(page.continuation);
     setScope(startupScope);
     setMode(restoredMode);
     beginReadingSession(startupScope, restoredMode, true);
     setView("list");
     notify("已进入预览模式");
-  }, [beginReadingSession, notify]);
+  }, [beginReadingSession, notify, replaceArticleList]);
 
   /**
    * Restore the current runtime's account on startup; the browser's ?preview=1 flag and
@@ -834,7 +851,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
         setFolders(bootstrap.folders);
         setReadingListUnreadCount(bootstrap.readingListUnreadCount);
         setFeedUnreadCounts(createFeedUnreadCounts(bootstrap.feeds));
-        setArticles(firstPage.items);
+        replaceArticleList(firstPage.items);
         setContinuation(firstPage.continuation);
         setSelectedId(firstPage.items[0]?.id ?? null);
         setScope(startupScope);
@@ -849,7 +866,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
 
     void restore();
     return () => { cancelled = true; };
-  }, [beginReadingSession, enterPreview, notify, platform, rssClient]);
+  }, [beginReadingSession, enterPreview, notify, platform, rssClient, replaceArticleList]);
 
   /**
    * Reconcile sidebar counts with FreshRSS's unread-count endpoint. Read-state writes during the
@@ -952,7 +969,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     }
 
     if (pageResult.status === "fulfilled") {
-      setArticles(pageResult.value.items);
+      replaceArticleList(pageResult.value.items);
       setContinuation(pageResult.value.continuation);
       setSelectedId(pageResult.value.items[0]?.id ?? null);
       beginReadingSession(scope, mode, true);
@@ -965,7 +982,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     }
 
     if (listSequence === requestSequenceRef.current) setLoadingList(false);
-  }, [applyPreviewScope, beginReadingSession, mode, notify, previewMode, scope, rssClient]);
+  }, [applyPreviewScope, beginReadingSession, mode, notify, previewMode, scope, rssClient, replaceArticleList]);
 
   /**
    * Mark the entire current FreshRSS stream as read, then rebuild the list using its first page and
@@ -1051,7 +1068,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
 
       const pageIsFresh = pageResult.status === "fulfilled" && !pageResult.value.fromCache;
       if (pageIsFresh) {
-        setArticles(pageResult.value.items);
+        replaceArticleList(pageResult.value.items);
         setContinuation(pageResult.value.continuation);
         setSelectedId(pageResult.value.items[0]?.id ?? null);
       }
@@ -1077,7 +1094,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } finally {
       if (listSequence === requestSequenceRef.current) setLoadingList(false);
     }
-  }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient]);
+  }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient, replaceArticleList]);
 
   /**
    * Submit final article states and use a separate operation sequence for each field to handle
@@ -1398,7 +1415,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * 则保证旧 Feed 的慢响应不能混入用户后来打开的新列表。
    */
   const loadMore = useCallback(async (reason: LoadMoreReason) => {
-    if (!continuation || previewMode || loadMoreInFlightRef.current) return;
+    if (!continuation || loadMoreInFlightRef.current) return;
 
     const requestId = ++loadMoreRequestRef.current;
     const listSequence = requestSequenceRef.current;
@@ -1407,11 +1424,16 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setLoadingMore(true);
 
     try {
-      const page = await rssClient.getStream({
-        streamId: getStreamId(scope),
-        unreadOnly: mode === "unread",
-        continuation: requestedContinuation,
-      });
+      const page = previewMode
+        ? getPreviewArticlePage(
+          previewListArticlesRef.current.map((article) => previewArticlesRef.current.get(article.id) ?? article),
+          requestedContinuation,
+        )
+        : await rssClient.getStream({
+          streamId: getStreamId(scope),
+          unreadOnly: mode === "unread",
+          continuation: requestedContinuation,
+        });
 
       // If the scope or subsequent request has changed, discard this response without touching UI
       // state.
@@ -1574,6 +1596,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
             <div className="h-full min-h-0" aria-hidden={view === "reader"} inert={view === "reader"}>
               <ArticleListPage
                 articles={articles}
+                listNow={listNow}
+                timeSectionLabels={timeSectionLabels}
                 feeds={feeds}
                 refreshKey={listRefreshKey}
                 mode={mode}
