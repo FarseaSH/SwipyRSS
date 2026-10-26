@@ -126,8 +126,13 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
         ? secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + innerStart, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight)
         : innerStart;
       // Feed selection keeps its existing second-row placement in both scroll areas.
-      const outerScrollTop = selectedFeedId ? secondRowScrollTop : folderScrollTop;
-      const outerEnd = outerScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + outerStart, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
+      const rowRect = row.getBoundingClientRect();
+      const itemTop = rowRect.top - area.getBoundingClientRect().top + outerStart;
+      const previousGroup = group.previousElementSibling;
+      const rowGap = previousGroup ? Math.max(0, group.getBoundingClientRect().top - previousGroup.getBoundingClientRect().bottom) : 0;
+      const outerEnd = selectedFeedId
+        ? secondRowScrollTop(itemTop, row.offsetHeight + 4, area.scrollHeight, area.clientHeight)
+        : folderScrollTop(itemTop, rowRect.height, area.scrollHeight, area.clientHeight, rowGap);
       for (const { animation, start } of motions) animation.currentTime = start;
       area.scrollTop = outerStart;
       const started = performance.now();

@@ -17,8 +17,8 @@ function setup(mobile = true, folderTop = 0) {
   const closing = { playState: "running", finished: new Promise(resolve => { finishClosing = () => { closing.playState = "finished"; resolve(); }; }) };
   const viewport = { scrollTop: 0, scrollHeight: 396, clientHeight: 180, getBoundingClientRect: () => ({ top: 0 }) };
   const feed = { dataset: { feedId: "feed7" }, offsetHeight: 36, getBoundingClientRect: () => ({ top: 216 - viewport.scrollTop }) };
-  const row = { offsetHeight: 36, getBoundingClientRect: () => ({ top: folderTop - area.scrollTop }) };
-  const group = { dataset: { folderId: "folder" }, querySelector: selector => selector === ".sidebar-folder-row" ? row : viewport, querySelectorAll: () => [feed] };
+  const row = { offsetHeight: 36, getBoundingClientRect: () => ({ top: folderTop - area.scrollTop, height: 36 }) };
+  const group = { dataset: { folderId: "folder" }, getBoundingClientRect: () => ({ top: folderTop - area.scrollTop }), previousElementSibling: { getBoundingClientRect: () => ({ bottom: folderTop - area.scrollTop - 4 }) }, querySelector: selector => selector === ".sidebar-folder-row" ? row : viewport, querySelectorAll: () => [feed] };
   const area = { scrollTop: 0, scrollHeight: 500, clientHeight: 400, getBoundingClientRect: () => ({ top: 0 }), querySelectorAll: () => [group], getAnimations: () => treeAnimations, addEventListener(name, callback) { listeners.set(name, callback); }, removeEventListener(name) { listeners.delete(name); } };
   const drawer = { getAnimations: () => [closing] };
   const react = {
@@ -181,7 +181,7 @@ test("folder selection changes only the outer offset; Feed selection retains sec
   const app = setup(false, 120);
   app.render({ selectedFolderId: "folder" });
   app.advance(1000);
-  assert.equal(app.area.scrollTop, 60);
+  assert.equal(app.area.scrollTop, 57);
   app.select();
   app.advance(1000);
   assert.equal(app.area.scrollTop, 80);

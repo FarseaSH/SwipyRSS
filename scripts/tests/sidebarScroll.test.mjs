@@ -48,11 +48,25 @@ test("scroll duration grows with distance without an upper time cap", () => {
 });
 
 
-test("folder placement leaves 1.5 rows above it and respects both boundaries", () => {
-  assert.equal(folderScrollTop(240, 40, 800, 200), 180);
+test("folder placement leaves 1.5 rows plus 1px above it and respects both boundaries", () => {
+  assert.equal(folderScrollTop(240, 40, 800, 200), 179);
   assert.equal(folderScrollTop(0, 40, 800, 200), 0);
   assert.equal(folderScrollTop(40, 40, 800, 200), 0);
-  assert.equal(folderScrollTop(80, 40, 800, 200), 20);
+  assert.equal(folderScrollTop(80, 40, 800, 200), 19);
   assert.equal(folderScrollTop(760, 40, 800, 200), 600);
   assert.equal(folderScrollTop(80, 40, 120, 200), 0);
+});
+
+test("folder clipping exposes half the row plus 1px rather than half its gap-inclusive pitch", () => {
+  for (const [height, gap] of [[41, 4], [40.5, 6], [44, 0]]) {
+    const pitch = height + gap;
+    const itemTop = 5 * pitch;
+    const scroll = folderScrollTop(itemTop, height, 1000, 200, gap);
+    // Two rows before the selection, half the row plus 1px remains visible.
+    const clippedTop = itemTop - 2 * pitch - scroll;
+    assert.equal(clippedTop, -height / 2 + 1);
+    assert.equal(clippedTop + height, height / 2 + 1);
+  }
+  assert.equal(folderScrollTop(45, 41, 1000, 200, 4), 0);
+  assert.equal(folderScrollTop(950, 41, 1000, 200, 4), 800);
 });

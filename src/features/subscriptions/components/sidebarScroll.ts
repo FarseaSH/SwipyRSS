@@ -3,9 +3,9 @@ export function secondRowScrollTop(itemTop: number, rowHeight: number, scrollHei
   return Math.max(0, Math.min(itemTop - rowHeight, Math.max(0, scrollHeight - viewportHeight)));
 }
 
-/** Leave one full folder row and a partial row above the selected folder. */
-export function folderScrollTop(itemTop: number, rowPitch: number, scrollHeight: number, viewportHeight: number) {
-  return secondRowScrollTop(itemTop, rowPitch * 1.5, scrollHeight, viewportHeight);
+/** Leave the first row's lower half plus 1px for visual balance, two gaps and a full row. */
+export function folderScrollTop(itemTop: number, rowHeight: number, scrollHeight: number, viewportHeight: number, rowGap = 0) {
+  return secondRowScrollTop(itemTop, rowHeight * 1.5 + rowGap * 2 + 1, scrollHeight, viewportHeight);
 }
 
 /** A gentle start/stop allowance plus travel time, with no maximum duration. */
