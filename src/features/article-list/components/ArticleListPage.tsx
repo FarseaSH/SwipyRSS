@@ -16,6 +16,9 @@ import { getReturnAnchor, getReturnVisibleArticleIds } from "../hooks/returnArti
 import { ArticleCard } from "./ArticleCard";
 import { shouldMarkAboveRead } from "../markReadAction";
 import { useArticleShortcutMode } from "../hooks/useArticleShortcutMode";
+import { unreadIdsThroughArticle } from "../contextMenu";
+import { useArticleContextMenu } from "../hooks/useArticleContextMenu";
+import { ArticleContextMenu, FeedReadConfirmation } from "./ArticleContextMenu";
 
 /**
  * Inputs and interactive controls retain their own keyboard behavior.
@@ -78,6 +81,7 @@ type Props = {
   onRefreshList: () => Promise<void>;
   onMarkAllRead: () => Promise<void>;
   onMarkAboveRead: (ids: string[]) => Promise<void>;
+  onMarkFeedRead: (feedId: string) => Promise<void>;
   onOpenSidebar: () => void;
   onOpenArticle: (id: string) => void;
   onOpenExternal: (url: string) => void;
@@ -142,7 +146,7 @@ export function ArticleListPage(props: Props) {
   const markReadTriggerRef = useRef<HTMLButtonElement>(null);
   const markReadConfirmationPageRef = useRef(0);
   const sourceNavigationRef = useRef<HTMLElement>(null);
-  const listScopeKey = `${props.mode}:${props.selectedFolder?.id ?? "all-folders"}:${props.selectedFeed?.id ?? "all-feeds"}`;
+  const listScopeKey = `${props.isStarredList ? "starred" : "reading"}:${props.mode}:${props.selectedFolder?.id ?? "all-folders"}:${props.selectedFeed?.id ?? "all-feeds"}`;
   const listKey = `${listScopeKey}:${props.refreshKey}`;
   const [bottomToolbarDimmed, setBottomToolbarDimmed] = useState(false);
   const [sideToolbarCollapsed, setSideToolbarCollapsed] = useState(() => props.sideToolbarCollapsedRef.current);
@@ -176,6 +180,19 @@ export function ArticleListPage(props: Props) {
   const [refreshingList, setRefreshingList] = useState(false);
   const [markReadConfirmationOpen, setMarkReadConfirmationOpen] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
+  const [confirmFeed, setConfirmFeed] = useState<{ id: string; name: string } | null>(null);
+  const [markingFeed, setMarkingFeed] = useState(false);
+  const markingFeedRef = useRef(false);
+  const [feedReadError, setFeedReadError] = useState("");
+  const contextEnabled = props.active && !props.sidebarOpen && !props.autoCollapsePaused
+    && !hoverLocked && !markReadConfirmationOpen && !markingRead && !confirmFeed && !refreshingList;
+  const contextMenu = useArticleContextMenu(contextEnabled, listKey);
+  const contextArticle = contextMenu.menu ? props.articles.find((article) => article.id === contextMenu.menu!.articleId) : undefined;
+  const contextAboveIds = contextArticle ? unreadIdsThroughArticle(props.articles, contextArticle.id) : [];
+  useEffect(() => {
+    setConfirmFeed(null);
+    setFeedReadError("");
+  }, [listKey, props.active, props.sidebarOpen]);
   const markReadSubmittingRef = useRef(false);
   const [markReadError, setMarkReadError] = useState("");
   const [pendingAboveReadIds, setPendingAboveReadIds] = useState<string[]>([]);
@@ -190,7 +207,7 @@ export function ArticleListPage(props: Props) {
   const collapseSideToolbar = useCallback(() => setSwitchDimmed(true), [setSwitchDimmed]);
   const { bumpActivity: bumpToolbarActivity } = useListToolbarAutoCollapse(
     toolbarRef, props.active && props.toolbarPosition !== "bottom" && !switchDimmed,
-    props.autoCollapsePaused || props.sidebarOpen || refreshingList || markReadConfirmationOpen || markingRead,
+    props.autoCollapsePaused || props.sidebarOpen || refreshingList || markReadConfirmationOpen || markingRead || Boolean(contextMenu.menu) || Boolean(confirmFeed),
     collapseSideToolbar,
   );
   const wakeListToolbar = useCallback(() => {
@@ -406,7 +423,21 @@ export function ArticleListPage(props: Props) {
     setReturnSelection((selection) => selection && selection.phase !== "releasing"
       ? { ...selection, phase: "releasing" } : selection);
   }, [props.toolbarPosition, setSwitchDimmed, markingRead]);
-  const { trackRef, currentPage, settledPage, leadingArticleId, hasNextPage, focusedArticleIds, lastReadArticleId, suppressClickRef, repositionToPage, stepPage } = useArticlePaging(viewportRef, pageOffsets, bottomMaskOffsets, listKey, handlePageDirection, resolveForwardPageStart, props.articles.length > 0);
+  const requestContextMenu = useCallback((articleId: string, x: number, y: number, input: "mouse" | "touch" = "mouse"): boolean => {
+    if (!contextEnabled || viewportRef.current?.classList.contains("is-paging")) return false;
+    const card = Array.from(viewportRef.current?.querySelectorAll<HTMLElement>(".article-card") ?? [])
+      .find((element) => element.dataset.articleId === articleId);
+    if (!card || card.inert || card.closest("[inert]")) return false;
+    if (props.toolbarPosition !== "bottom" && !switchDimmed) {
+      collapseSideToolbar();
+      return true;
+    }
+    contextMenu.open(articleId, x, y, input);
+    return true;
+  }, [contextEnabled, props.toolbarPosition, switchDimmed, collapseSideToolbar, contextMenu.open]);
+  const { trackRef, currentPage, settledPage, leadingArticleId, hasNextPage, focusedArticleIds, lastReadArticleId, suppressClickRef, repositionToPage, stepPage } = useArticlePaging(viewportRef, pageOffsets, bottomMaskOffsets, listKey, handlePageDirection, resolveForwardPageStart, props.articles.length > 0, {
+    enabled: contextEnabled, onLongPress: (articleId, x, y) => requestContextMenu(articleId, x, y, "touch"), onPagingStart: contextMenu.close,
+  });
   /**
    * Replace the precomputed group start with the actual first article so current-group actions match the
    * articles in focus.
@@ -458,7 +489,7 @@ export function ArticleListPage(props: Props) {
   }, [markingRead]);
   useListToolbarDismiss({
     toolbarRef, popoverRef: markReadPopoverRef,
-    enabled: props.active && !props.autoCollapsePaused && !props.sidebarOpen && props.toolbarPosition !== "bottom",
+    enabled: props.active && !props.autoCollapsePaused && !props.sidebarOpen && !contextMenu.menu && !confirmFeed && props.toolbarPosition !== "bottom",
     expanded: !switchDimmed, confirmationOpen: markReadConfirmationOpen, submitting: markingRead,
     collapse: collapseSideToolbar, closeConfirmation: closeMarkReadConfirmation,
   });
@@ -914,7 +945,7 @@ export function ArticleListPage(props: Props) {
   };
 
   const shortcutsBlocked = !props.active || props.autoCollapsePaused || props.sidebarOpen
-    || markReadConfirmationOpen || markingRead || refreshingList;
+    || markReadConfirmationOpen || markingRead || refreshingList || Boolean(contextMenu.menu) || Boolean(confirmFeed);
   const shortcutScreenKey = JSON.stringify([
     listKey, props.isStarredList, currentPage, currentPageArticles.slice(0, 9).map((article) => article.id),
   ]);
@@ -931,7 +962,7 @@ export function ArticleListPage(props: Props) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Alt") return;
       if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey || event.shiftKey || event.getModifierState("AltGraph")) return;
-      if (isInteractiveShortcutTarget(event.target) || viewportRef.current?.closest("[inert]")) return;
+      if (document.querySelector(".article-context-menu, .feed-read-confirm") || isInteractiveShortcutTarget(event.target) || viewportRef.current?.closest("[inert]")) return;
       resetShortcutMode();
       setArticleNumbersVisible(true);
     };
@@ -960,7 +991,7 @@ export function ArticleListPage(props: Props) {
     if (shortcutsBlocked) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey) return;
-      if (markReadConfirmationOpen || markingRead || viewportRef.current?.closest("[inert]")) return;
+      if (document.querySelector(".article-context-menu, .feed-read-confirm") || markReadConfirmationOpen || markingRead || viewportRef.current?.closest("[inert]")) return;
       if (isInteractiveShortcutTarget(event.target)) return;
 
       // Option plus a number can produce special characters on macOS, so identify shortcuts by
@@ -1050,6 +1081,26 @@ export function ArticleListPage(props: Props) {
 
   return (
     <section data-list-confirmation-open={props.toolbarPosition !== "bottom" && markReadConfirmationOpen ? "true" : undefined} className="relative flex h-dvh min-w-0 flex-col bg-canvas">
+      {contextMenu.menu && contextArticle ? <ArticleContextMenu
+        anchor={contextMenu.menu} article={contextArticle} feed={feedsById.get(contextArticle.feedId)}
+        mixed={!props.selectedFeed} canMarkAbove={contextAboveIds.length > 0} menuRef={contextMenu.menuRef}
+        onClose={contextMenu.close}
+        onStar={() => props.onToggleStar(contextArticle.id)}
+        onMarkAbove={() => {
+          void props.onMarkAboveRead(contextAboveIds).then(() => setToolbarNotice(`该条及上方 ${contextAboveIds.length} 篇已标记为已读`)).catch(() => setToolbarNotice("标记已读失败，已恢复原状态"));
+        }}
+        onMarkFeed={() => { setFeedReadError(""); setConfirmFeed({ id: contextArticle.feedId, name: feedsById.get(contextArticle.feedId)?.title ?? contextArticle.feedTitle }); }}
+        onSelectFeed={() => props.onSelectFeed(contextArticle.feedId)}
+      /> : null}
+      {confirmFeed ? <FeedReadConfirmation name={confirmFeed.name} busy={markingFeed} error={feedReadError}
+        onCancel={() => { if (!markingFeedRef.current) setConfirmFeed(null); }}
+        onConfirm={() => {
+          if (markingFeedRef.current) return;
+          markingFeedRef.current = true;
+          setMarkingFeed(true);
+          setFeedReadError("");
+          void props.onMarkFeedRead(confirmFeed.id).then(() => setConfirmFeed(null)).catch(() => setFeedReadError("操作未完成，请检查连接后重试。")).finally(() => { markingFeedRef.current = false; setMarkingFeed(false); });
+        }}/>: null}
       <header className="app-header sticky top-0 z-30 grid h-[52px] grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-x-2 border-b px-4 backdrop-blur-xl sm:h-16 sm:grid-cols-[1fr_auto_1fr] sm:gap-x-0 sm:px-6">
         <div className="justify-self-start"><button className="icon-button lg:hidden" onClick={props.onOpenSidebar} aria-label="打开侧边栏"><Menu size={20}/></button></div>
         <div className="flex w-full min-w-0 max-w-[60vw] items-center justify-center justify-self-center gap-2 sm:w-auto sm:max-w-[45vw]">
@@ -1126,6 +1177,8 @@ export function ArticleListPage(props: Props) {
                   active={activeArticleIds.has(article.id)}
                   shortcutNumber={!shortcutsBlocked && (articleNumbersVisible || shortcutMode === "go") && pageIsSettled ? articleShortcutNumbers.get(article.id) : undefined}
                   starShortcutNumber={!shortcutsBlocked && !articleNumbersVisible && shortcutMode === "star" && pageIsSettled ? articleShortcutNumbers.get(article.id) : undefined}
+                  contextMenuActive={contextMenu.menu?.articleId === article.id}
+                  onContextMenu={(x, y) => { requestContextMenu(article.id, x, y); }}
                   highlightPhase={readingArticleId === article.id ? "reading"
                     : visibleReturnSelection?.id === article.id ? visibleReturnSelection.phase : "idle"}
                   onHighlightEnd={() => {

@@ -15,7 +15,10 @@
     "preview": "vite preview --mode web",
     "test:platform": "node --test scripts/tests/platform.test.mjs",
     "test:time": "node --test scripts/tests/article-time.test.mjs",
-    "test:time-sections": "node --test scripts/tests/timeSections.test.mjs"
+    "test:time-sections": "node --test scripts/tests/timeSections.test.mjs",
+    "build:site": "node scripts/build-site.mjs",
+    "test:context-menu": "node --test scripts/tests/context-menu.test.mjs",
+    "test:context-menu:browser": "node scripts/tests/context-menu.browser.cjs"
   },
   "dependencies": {
     "dompurify": "^3.2.6",
@@ -30,6 +33,7 @@
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
+    "playwright": "^1.64.1",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2",
     "vite": "^7.1.2",
