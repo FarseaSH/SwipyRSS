@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-export type ArticleMenuAnchor = { articleId: string; x: number; y: number };
+export type ArticleMenuAnchor = { articleId: string; x: number; y: number; input: "mouse" | "touch" };
 
 export function useArticleContextMenu(enabled: boolean, resetKey: string) {
   const [menu, setMenu] = useState<ArticleMenuAnchor | null>(null);
@@ -11,8 +11,8 @@ export function useArticleContextMenu(enabled: boolean, resetKey: string) {
     current.current = null;
     setMenu(null);
   }, []);
-  const open = useCallback((articleId: string, x: number, y: number) => {
-    const next = { articleId, x, y };
+  const open = useCallback((articleId: string, x: number, y: number, input: ArticleMenuAnchor["input"] = "mouse") => {
+    const next = { articleId, x, y, input };
     current.current = next;
     setMenu(next);
   }, []);

@@ -418,7 +418,7 @@ export function ArticleListPage(props: Props) {
     setReturnSelection((selection) => selection && selection.phase !== "releasing"
       ? { ...selection, phase: "releasing" } : selection);
   }, [props.toolbarPosition, setSwitchDimmed, markingRead]);
-  const requestContextMenu = useCallback((articleId: string, x: number, y: number): boolean => {
+  const requestContextMenu = useCallback((articleId: string, x: number, y: number, input: "mouse" | "touch" = "mouse"): boolean => {
     if (!contextEnabled || viewportRef.current?.classList.contains("is-paging")) return false;
     const card = Array.from(viewportRef.current?.querySelectorAll<HTMLElement>(".article-card") ?? [])
       .find((element) => element.dataset.articleId === articleId);
@@ -427,11 +427,11 @@ export function ArticleListPage(props: Props) {
       collapseSideToolbar();
       return true;
     }
-    contextMenu.open(articleId, x, y);
+    contextMenu.open(articleId, x, y, input);
     return true;
   }, [contextEnabled, props.toolbarPosition, switchDimmed, collapseSideToolbar, contextMenu.open]);
   const { trackRef, currentPage, settledPage, leadingArticleId, hasNextPage, focusedArticleIds, lastReadArticleId, suppressClickRef, repositionToPage, stepPage } = useArticlePaging(viewportRef, pageOffsets, bottomMaskOffsets, listKey, handlePageDirection, resolveForwardPageStart, props.articles.length > 0, {
-    enabled: contextEnabled, onLongPress: requestContextMenu, onPagingStart: contextMenu.close,
+    enabled: contextEnabled, onLongPress: (articleId, x, y) => requestContextMenu(articleId, x, y, "touch"), onPagingStart: contextMenu.close,
   });
   /**
    * Replace the precomputed group start with the actual first article so current-group actions match the
