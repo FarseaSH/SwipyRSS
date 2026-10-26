@@ -3,6 +3,11 @@ export function secondRowScrollTop(itemTop: number, rowHeight: number, scrollHei
   return Math.max(0, Math.min(itemTop - rowHeight, Math.max(0, scrollHeight - viewportHeight)));
 }
 
+/** Leave the first row's lower half plus 1px for visual balance, two gaps and a full row. */
+export function folderScrollTop(itemTop: number, rowHeight: number, scrollHeight: number, viewportHeight: number, rowGap = 0) {
+  return secondRowScrollTop(itemTop, rowHeight * 1.5 + rowGap * 2 + 1, scrollHeight, viewportHeight);
+}
+
 /** A gentle start/stop allowance plus travel time, with no maximum duration. */
 export function sidebarScrollDuration(distance: number) {
   return distance === 0 ? 0 : 160 + Math.abs(distance) * 1.2;
