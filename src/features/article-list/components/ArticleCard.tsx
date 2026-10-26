@@ -1,9 +1,9 @@
 import type { TimeSection } from "../timeSections";
 import { Star } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { ReadStateIcon } from "@/components/ReadStateIcon";
 import type { Article, ArticleCardLayout } from "@/types";
-import { ArticleCardVisual, ArticleSourceIcon, ArticleSourceLabel } from "./ArticleCardVisual";
+import { ArticleCardVisual, ArticleSourceLabel } from "./ArticleCardVisual";
 import { ArticleShortcutNumber } from "./ArticleShortcutNumber";
 
 type Props = {
@@ -16,10 +16,7 @@ type Props = {
   starShortcutNumber?: number;
   highlightPhase: "idle" | "reading" | "holding" | "releasing";
   onHighlightEnd: () => void;
-  feedLinkEnabled: boolean;
-  isCurrentFeed: boolean;
   onOpen: () => void;
-  onSelectFeed: () => void;
   onToggleRead: () => void;
   onToggleStar: () => void;
   onLayoutChange: (articleId: string, layout: ArticleCardLayout) => void;
@@ -27,16 +24,12 @@ type Props = {
 };
 
 /**
- * Render one article while separating feed navigation and state actions from opening the card.
- * 渲染单篇文章，并把来源跳转和状态操作与卡片打开动作隔离。
+ * Render one article with a static feed label and independent read/star actions.
+ * 渲染单篇文章，来源标签随卡片打开正文，已读和收藏操作保持独立。
  */
-export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, active, shortcutNumber, starShortcutNumber, highlightPhase, onHighlightEnd, feedLinkEnabled, isCurrentFeed, onOpen, onSelectFeed, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
-  const [sourceNotice, setSourceNotice] = useState("");
-  const [sourceNoticeVisible, setSourceNoticeVisible] = useState(false);
+export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, active, shortcutNumber, starShortcutNumber, highlightPhase, onHighlightEnd, onOpen, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
   const [titleFitsOneLine, setTitleFitsOneLine] = useState(false);
   const titleMeasureRef = useRef<HTMLHeadingElement>(null);
-  const sourceNoticeHideTimerRef = useRef<number | null>(null);
-  const sourceNoticeClearTimerRef = useRef<number | null>(null);
   const hasSummary = article.summaryText.trim().length > 0;
   const getHeightClass = (fitsOneLine: boolean): ArticleCardLayout["heightClass"] => {
     if (!fitsOneLine) return "title-only";
@@ -47,22 +40,6 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
     titleFitsOneLine,
   };
   const open = () => { if (!suppressClick()) onOpen(); };
-
-  useEffect(() => () => {
-    window.clearTimeout(sourceNoticeHideTimerRef.current ?? undefined);
-    window.clearTimeout(sourceNoticeClearTimerRef.current ?? undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!sourceNotice) return;
-    // After mounting on demand, paint the hidden state first and then reuse the existing fade-in
-    // transition.
-    // 按需挂载后先绘制隐藏状态，再沿用原来的淡入过渡。
-    let frame = window.requestAnimationFrame(() => {
-      frame = window.requestAnimationFrame(() => setSourceNoticeVisible(true));
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [sourceNotice]);
 
   useLayoutEffect(() => {
     const measureElement = titleMeasureRef.current;
@@ -100,29 +77,6 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
     };
   }, [article.id, article.title, hasSummary, onLayoutChange]);
 
-  /**
-   * Show a brief message when clicking the current feed; delegate other feed clicks to the list
-   * wrapper to switch streams.
-   *
-   * 点击当前来源时给出轻提示；点击其他来源时交给列表容器切换 stream。
-   */
-  const selectFeed = () => {
-    if (!isCurrentFeed) {
-      onSelectFeed();
-      return;
-    }
-    window.clearTimeout(sourceNoticeHideTimerRef.current ?? undefined);
-    window.clearTimeout(sourceNoticeClearTimerRef.current ?? undefined);
-    setSourceNotice("已经到这个来源了");
-    // Repeated clicks, including during fade-out, restore visibility and restart the display timer.
-    // 重复点击（包括淡出期间）直接恢复显示，并重新计算停留时间。
-    if (sourceNotice) setSourceNoticeVisible(true);
-    sourceNoticeHideTimerRef.current = window.setTimeout(() => {
-      setSourceNoticeVisible(false);
-      sourceNoticeClearTimerRef.current = window.setTimeout(() => setSourceNotice(""), 260);
-    }, 1600);
-  };
-
   return (
     <article
       className={`article-card ${layout.heightClass} ${article.isRead ? "read" : ""} ${highlightPhase !== "idle" ? `reading-highlight highlight-${highlightPhase}` : ""}`}
@@ -145,17 +99,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
         article={article}
         titleFitsOneLine={titleFitsOneLine}
         titleMeasureRef={titleMeasureRef}
-        source={feedLinkEnabled ? (
-            <span className="article-source-wrap">
-              <button className="article-source-link" aria-label={isCurrentFeed ? `当前已经是来源 ${article.feedTitle}` : `查看来源 ${article.feedTitle}`} onClick={(event) => { event.stopPropagation(); selectFeed(); }}>
-                <ArticleSourceIcon iconUrl={feedIconUrl} color={article.feedColor}/>
-                <span className="truncate">{article.feedTitle}</span>
-              </button>
-              {sourceNotice ? <span className={`article-source-notice ${sourceNoticeVisible ? "visible" : ""}`} role="status">{sourceNotice}</span> : null}
-            </span>
-          ) : (
-            <ArticleSourceLabel article={article} iconUrl={feedIconUrl}/>
-          )}
+        source={<ArticleSourceLabel article={article} iconUrl={feedIconUrl}/>}
         readAction={<button className="icon-button article-read-button" aria-label={article.isRead ? "取消已读" : "标记已读"} title={article.isRead ? "取消已读" : "标记已读"} onClick={(e) => { e.stopPropagation(); onToggleRead(); }}>{shortcutNumber ? <ArticleShortcutNumber number={shortcutNumber}/> : <ReadStateIcon isRead={article.isRead} size={18}/>}</button>}
         starAction={<button className={`icon-button article-star-button ${article.isStarred ? "starred" : ""} ${starShortcutNumber ? "showing-shortcut" : ""}`} aria-label={article.isStarred ? "取消星标" : "加入星标"} onClick={(e) => { e.stopPropagation(); onToggleStar(); }}>{starShortcutNumber ? <ArticleShortcutNumber number={starShortcutNumber}/> : <Star size={17} fill={article.isStarred ? "currentColor" : "none"}/>}</button>}
       />
