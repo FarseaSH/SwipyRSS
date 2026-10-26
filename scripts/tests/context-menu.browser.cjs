@@ -117,11 +117,26 @@ testUrl.searchParams.set('preview','1');
  const a=p.locator('.article-card:not([inert])').first();let b=await a.boundingBox();let x=b.x+90,y=b.y+35;
  await touch('touchStart',[[x,y]]);await p.waitForTimeout(560);await p.getByRole('menu').waitFor();await touch('touchEnd',[]);await p.waitForTimeout(100);
  assert.equal(await p.locator('.reader-panel.open').count(),0);
- let m=await p.getByRole('menu').boundingBox();assert.ok(m.x>=8&&m.x+m.width<=382.5);
+ let m=await p.getByRole('menu').boundingBox();assert.ok(m.x>=12&&m.x+m.width<=378.5);
+ assert.ok(Math.abs(m.x-Math.max(12,Math.min(x-m.width/2,378-m.width)))<1,'touch menu follows press horizontally');
+ assert.ok(Math.abs(m.y-(b.y+b.height+12))<1,'first card menu falls below card with 12px gap');
  await p.screenshot({path:output+'/context-menu-mobile.png'});
  await p.keyboard.press('Escape');
  assert.equal(await p.locator('.context-menu-active').count(),0);
- results.push('Touch: 500ms long press opens at initial point, fits mobile viewport, and release does not open reader');
+ results.push('Touch: 500ms long press positions near contact below top card with 12px gap; release does not open reader');
+ // Touching either side changes the horizontal placement but keeps the same above-card anchor.
+ const lower=p.locator('.article-card:not([inert])').nth(2);const lowerBox=await lower.boundingBox();
+ let firstPlacement;
+ for(const dx of [40,lowerBox.width-40]) {
+  await touch('touchStart',[[lowerBox.x+dx,lowerBox.y+35]]);await p.waitForTimeout(560);
+  await p.getByRole('menu').waitFor();await touch('touchEnd',[]);
+  const box=await p.getByRole('menu').boundingBox();
+  assert.ok(Math.abs(box.x-Math.max(12,Math.min(lowerBox.x+dx-box.width/2,378-box.width)))<1);
+  assert.ok(Math.abs(box.y+box.height-(lowerBox.y-12))<1,'prefer above card with 12px gap');
+  if(firstPlacement) {assert.ok(box.x>firstPlacement.x);assert.ok(Math.abs(box.y-firstPlacement.y)<1);}
+  firstPlacement=box;await p.keyboard.press('Escape');
+ }
+ results.push('Touch: lower-card menu follows left/right contact and stays above the card');
  for (const variant of ['six-pixels','cancel','multitouch']) {
   await touch('touchStart',[[x,y]]);
   if(variant==='six-pixels') await touch('touchMove',[[x+6,y]]);

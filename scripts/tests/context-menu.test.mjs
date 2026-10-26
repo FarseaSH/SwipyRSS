@@ -7,11 +7,11 @@ import ts from "typescript";
 function compile(source, globals = {}) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText, { exports, ...globals });
   return exports;
 }
-const { unreadIdsThroughArticle, contextMenuPosition } = compile(readFileSync(new URL("../../src/features/article-list/contextMenu.ts", import.meta.url), "utf8"));
+const { unreadIdsThroughArticle, contextMenuPosition, touchContextMenuPosition } = compile(readFileSync(new URL("../../src/features/article-list/contextMenu.ts", import.meta.url), "utf8"));
 const articles = [
   { id: "one", feedId: "feed/a", isRead: false, publishedAt: 1 },
   { id: "two", feedId: "feed/b", isRead: false, publishedAt: 2 },
@@ -34,6 +34,82 @@ test("Menu independently flips all four corners, clamps, and respects visual vie
   }
   assert.deepEqual({ ...contextMenuPosition(0, 0, 280, 240, viewport) }, { left: 8, top: 8 });
   assert.deepEqual({ ...contextMenuPosition(200, 110, 200, 100, { left: 100, top: 50, width: 220, height: 120 }) }, { left: 108, top: 58 });
+});
+
+test("Touch menu follows the press horizontally, prefers above, and falls below near the top", () => {
+  const viewport = { left: 0, top: 0, width: 390, height: 844 };
+  const card = { left: 12, top: 400, width: 366, height: 104 };
+  const above = touchContextMenuPosition(card, 176, 230, viewport, 150);
+  assert.equal(above.left, 62);
+  assert.equal(above.top + 230, card.top - 12);
+  const below = touchContextMenuPosition({ ...card, top: 80 }, 176, 230, viewport, 150);
+  assert.equal(below.left, 62);
+  assert.equal(below.top, 80 + card.height + 12);
+  for (const [x, left] of [[40, 12], [195, 107], [350, 202]]) {
+    const position = touchContextMenuPosition(card, 176, 230, viewport, x);
+    assert.equal(position.left, left);
+    assert.equal(position.top, above.top, "horizontal contact must not change vertical placement");
+  }
+});
+
+test("Touch menu uses the larger side and scrolls without covering the card", () => {
+  const viewport = { left: 0, top: 0, width: 390, height: 400 };
+  const above = touchContextMenuPosition({ left: 12, top: 200, width: 366, height: 104 }, 176, 230, viewport);
+  assert.equal(above.top, 12);
+  assert.equal(above.maxHeight, 176);
+  const below = touchContextMenuPosition({ left: 12, top: 100, width: 366, height: 104 }, 176, 230, viewport);
+  assert.equal(below.top, 216);
+  assert.equal(below.maxHeight, 172);
+});
+
+test("Touch menu respects safe viewport offsets and keeps an oversized-card fallback usable", () => {
+  const viewport = { left: 20, top: 50, width: 350, height: 500 };
+  const position = touchContextMenuPosition({ left: 0, top: 320, width: 200, height: 100 }, 176, 100, viewport);
+  assert.equal(position.left, 32);
+  assert.equal(position.top, 208);
+  const fallback = touchContextMenuPosition({ left: 20, top: 50, width: 350, height: 500 }, 176, 600, viewport);
+  assert.equal(fallback.top, 62);
+  assert.equal(fallback.maxHeight, 476);
+});
+
+test("Menu component routes touch to the card, mouse to the click, and repositions on viewport changes", () => {
+  for (const input of ["touch", "mouse"]) {
+    let position;
+    let cardTop = 250;
+    const callbacks = new Map();
+    const observed = [];
+    const card = { dataset: { articleId: "target" }, getBoundingClientRect: () => ({ left: 12, top: cardTop, width: 366, height: 104 }) };
+    const menu = { style: {}, getBoundingClientRect: () => ({ width: 176, height: 240 }), focus() {} };
+    const dependencies = {
+      react: { useState: () => [null, (next) => { position = next; }], useLayoutEffect: (effect) => effect() },
+      "react-dom": { createPortal: (node) => node },
+      "react/jsx-runtime": { jsx: () => null, jsxs: () => null },
+      "../contextMenu": { contextMenuPosition, touchContextMenuPosition },
+    };
+    const viewport = { offsetLeft: 20, offsetTop: 50, width: 350, height: 400, addEventListener: (name, fn) => callbacks.set(name, fn) };
+    const { ArticleContextMenu } = compile(readFileSync(new URL("../../src/features/article-list/components/ArticleContextMenu.tsx", import.meta.url), "utf8"), {
+      require: (name) => dependencies[name] ?? {},
+      document: { querySelectorAll: () => [card], body: {} },
+      window: { visualViewport: viewport, addEventListener() {} },
+      getComputedStyle: () => ({ getPropertyValue: () => "0" }),
+      ResizeObserver: class { observe(element) { observed.push(element); } },
+    });
+    ArticleContextMenu({ anchor: { articleId: "target", x: 50, y: 300, input }, menuRef: { current: menu }, article: {} });
+    if (input === "touch") {
+      assert.equal(position.top, 62);
+      assert.equal(position.left, 32);
+      assert.equal(menu.style.maxHeight, "176px");
+      assert.ok(observed.includes(card));
+      cardTop = 80;
+      callbacks.get("resize")();
+      assert.equal(position.top, 196);
+      assert.equal(menu.style.maxHeight, "242px");
+    } else {
+      assert.deepEqual({ ...position }, { left: 50, top: 60 });
+      assert.equal(menu.style.maxHeight, "384px");
+      assert.ok(!observed.includes(card));
+    }
+  }
 });
 
 // Run the real App callback against controlled asynchronous service boundaries, as in platform.test.

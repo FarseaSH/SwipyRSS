@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { FeedIcon } from "@/components/FeedIcon";
 import type { Article, Feed } from "@/types";
-import { contextMenuPosition } from "../contextMenu";
+import { contextMenuPosition, touchContextMenuPosition } from "../contextMenu";
 import type { ArticleMenuAnchor } from "../hooks/useArticleContextMenu";
 
 type Props = {
@@ -25,6 +25,10 @@ export function ArticleContextMenu(props: Props) {
   useLayoutEffect(() => {
     const menu = props.menuRef.current;
     if (!menu) return;
+    const card = props.anchor.input === "touch"
+      ? Array.from(document.querySelectorAll<HTMLElement>(".article-card[data-article-id]"))
+        .find((element) => element.dataset.articleId === props.anchor.articleId)
+      : undefined;
     const place = () => {
       const viewport = window.visualViewport;
       const bounds = {
@@ -38,15 +42,23 @@ export function ArticleContextMenu(props: Props) {
       bounds.top += top;
       bounds.width -= left + right;
       bounds.height -= top + bottom;
-      menu.style.maxWidth = `${Math.max(0, bounds.width - 16)}px`;
-      menu.style.maxHeight = `${Math.max(0, bounds.height - 16)}px`;
+      const margin = props.anchor.input === "touch" ? 24 : 16;
+      menu.style.maxWidth = `${Math.max(0, bounds.width - margin)}px`;
+      menu.style.maxHeight = `${Math.max(0, bounds.height - margin)}px`;
       const rect = menu.getBoundingClientRect();
-      setPosition(contextMenuPosition(props.anchor.x, props.anchor.y, rect.width, rect.height, bounds));
+      if (card) {
+        const position = touchContextMenuPosition(card.getBoundingClientRect(), rect.width, rect.height, bounds, props.anchor.x);
+        menu.style.maxHeight = `${position.maxHeight}px`;
+        setPosition(position);
+      } else {
+        setPosition(contextMenuPosition(props.anchor.x, props.anchor.y, rect.width, rect.height, bounds));
+      }
     };
     place();
     menu.focus({ preventScroll: true });
     const observer = new ResizeObserver(place);
     observer.observe(menu);
+    if (card) observer.observe(card);
     window.addEventListener("resize", place);
     window.visualViewport?.addEventListener("resize", place);
     window.visualViewport?.addEventListener("scroll", place);
