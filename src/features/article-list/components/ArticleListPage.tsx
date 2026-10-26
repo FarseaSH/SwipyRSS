@@ -1132,15 +1132,12 @@ export function ArticleListPage(props: Props) {
                       finishReturnHighlight(visibleReturnSelection.sequence);
                     }
                   }}
-                  feedLinkEnabled={Boolean(props.selectedFolder || props.selectedFeed)}
-                  isCurrentFeed={props.selectedFeed?.id === article.feedId}
                   suppressClick={() => suppressClickRef.current}
                   onOpen={() => {
                     setReturnSelection(null);
                     setHighlightCue(null);
                     props.onOpenArticle(article.id);
                   }}
-                  onSelectFeed={() => props.onSelectFeed(article.feedId)}
                   onToggleRead={() => props.onToggleRead(article.id)}
                   onToggleStar={() => props.onToggleStar(article.id)}
                   onLayoutChange={recordArticleLayout}
