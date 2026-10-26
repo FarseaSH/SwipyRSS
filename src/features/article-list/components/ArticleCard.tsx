@@ -1,3 +1,4 @@
+import type { TimeSection } from "../timeSections";
 import { Star } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ReadStateIcon } from "@/components/ReadStateIcon";
@@ -7,7 +8,7 @@ import { ArticleShortcutNumber } from "./ArticleShortcutNumber";
 
 type Props = {
   listNow: number;
-  timeSectionLabel?: string;
+  timeSectionLabel?: TimeSection;
   article: Article;
   feedIconUrl?: string;
   active: boolean;
@@ -138,7 +139,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
       onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
     >
-      <span className="article-divider" aria-hidden="true">{timeSectionLabel ? <span className="article-time-section"><span className="article-time-section-text">{timeSectionLabel}</span></span> : null}</span>
+      <span className="article-divider" data-time-tone={timeSectionLabel?.tone} aria-hidden="true">{timeSectionLabel ? <span className="article-time-section"><span className="article-time-section-text">{timeSectionLabel.label}</span></span> : null}</span>
       <ArticleCardVisual
         listNow={listNow}
         article={article}

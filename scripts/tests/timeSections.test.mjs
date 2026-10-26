@@ -19,7 +19,7 @@ const { getTimeSection, getTimeSectionContext, updateTimeSections } = loadModule
 const at = (day, hour = 0, minute = 0) => new Date(2026, 9, day, hour, minute).getTime();
 const now = at(22, 23, 59);
 const item = (id, time) => ({ id: String(id), publishedAt: time });
-const labels = (state) => Array.from(state.labels.values());
+const labels = (state) => Array.from(state.labels.values(), (section) => section?.label);
 
 test("six-hour boundaries, calendar weeks, seven-day cutoff, and invalid dates", () => {
   for (const [hour, label] of [[0, "凌晨"], [5, "凌晨"], [6, "早上"], [11, "早上"], [12, "下午"], [17, "下午"], [18, "晚上"], [23, "晚上"]]) {
@@ -77,7 +77,7 @@ test("refresh, midnight, year boundary and time-zone changes rebuild the calenda
   assert.equal(getTimeSectionContext(0, at(22, 9)), context);
   assert.notEqual(getTimeSectionContext(1, now), context);
   const tomorrow = at(23);
-  assert.equal(updateTimeSections(state, articles, getTimeSectionContext(0, tomorrow), tomorrow).labels.get("1"), "昨天下午");
+  assert.equal(updateTimeSections(state, articles, getTimeSectionContext(0, tomorrow), tomorrow).labels.get("1")?.label, "昨天下午");
   const oldZone = process.env.TZ;
   try {
     process.env.TZ = "America/Los_Angeles";
@@ -114,8 +114,23 @@ test("selected time zone rebuilds sections and follows civil dates across DST", 
   const west = getTimeSectionContext(0, now, "America/Los_Angeles");
   assert.notEqual(east, west);
   const state = updateTimeSections(null, articles, east, now, "Asia/Shanghai");
-  assert.equal(state.labels.get("1"), "今天下午");
-  assert.equal(updateTimeSections(state, articles, west, now, "America/Los_Angeles").labels.get("1"), "昨天晚上");
+  assert.equal(state.labels.get("1")?.label, "今天下午");
+  assert.equal(updateTimeSections(state, articles, west, now, "America/Los_Angeles").labels.get("1")?.label, "昨天晚上");
   // DST makes the previous civil day 25 hours long.
   assert.equal(getTimeSection(Date.parse("2026-11-01T07:30:00Z"), Date.parse("2026-11-02T08:15:00Z"), "America/Los_Angeles").label, "昨天凌晨");
+});
+
+
+test("section tone follows the suffix boundary and freezes with it across appends and read updates", () => {
+  const articles = [item(1, at(20)), item(2, at(22, 15)), item(3, at(21, 9)), item(4, at(20)), item(5, at(1))];
+  const before = updateTimeSections(null, articles, "list", now);
+  assert.deepEqual(Array.from(before.labels.values(), (section) => section?.tone), ["recent", undefined, "recent", "older", "older"]);
+  assert.equal(before.labels.get("1").label, "今天下午");
+  const after = updateTimeSections(before, [...articles.map((article) => ({ ...article, isRead: true })), item(6, at(22))], "list", now);
+  for (const [id, section] of before.labels) assert.equal(after.labels.get(id), section);
+  assert.equal(after.labels.get("6"), undefined);
+  const published = Date.parse("2026-10-21T06:50:00Z");
+  const current = Date.parse("2026-10-22T07:05:00Z");
+  assert.equal(getTimeSection(published, current, "Asia/Shanghai").tone, "recent");
+  assert.equal(getTimeSection(published, current, "America/Los_Angeles").tone, "older");
 });
