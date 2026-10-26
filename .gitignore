@@ -48,3 +48,5 @@ src-tauri
 freshrss-extension
 experiments
 /xExtension-SwipyRSS/
+# Local development and browser verification artifacts
+/work/

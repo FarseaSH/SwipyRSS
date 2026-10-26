@@ -123,7 +123,15 @@ function applyMaskGeometry(
  * 指针拖动根据距离和速度吸附；触控板滚轮使用“消费一次、等待重新武装”
  * 的状态机，防止一次强惯性连续翻两页，又允许用户快速发起下一次手势。
  */
-export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, pageOffsets: number[], bottomMaskOffsets: number[], resetKey?: string | number, onPageDirection?: (direction: 1 | -1) => void, resolveForwardPageStart?: () => ForwardPageResolution, enabled = true) {
+export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, pageOffsets: number[], bottomMaskOffsets: number[], resetKey?: string | number, onPageDirection?: (direction: 1 | -1) => void, resolveForwardPageStart?: () => ForwardPageResolution, enabled = true, contextMenu?: {
+  enabled: boolean;
+  onLongPress: (articleId: string, x: number, y: number) => boolean;
+  onPagingStart: () => void;
+}) {
+  const contextMenuRef = useRef(contextMenu);
+  contextMenuRef.current = contextMenu;
+  const cancelLongPressRef = useRef<() => void>(() => {});
+  useLayoutEffect(() => { cancelLongPressRef.current(); }, [contextMenu?.enabled, resetKey]);
   const trackRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef(0);
   const settledPageRef = useRef(0);
@@ -342,6 +350,8 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
     let forwardBlocked = false;
     let pointerId: number | null = null;
     let touchPressTimer = 0;
+    let longPressTimer = 0;
+    let longPressConsumed = false;
     let suppressClickTimer = 0;
     let touchPressedCard: HTMLElement | null = null;
     // Wheel state excludes trailing momentum after consuming a page, then rearms for the next
@@ -383,15 +393,21 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
       });
     };
     const setPaging = (value: boolean) => {
+      if (value) {
+        window.clearTimeout(longPressTimer);
+        contextMenuRef.current?.onPagingStart();
+      }
       paging = value;
       viewport.classList.toggle("is-paging", value);
     };
     const clearTouchPress = () => {
+      window.clearTimeout(longPressTimer);
       window.clearTimeout(touchPressTimer);
       touchPressTimer = 0;
       touchPressedCard?.classList.remove("touch-pressed");
       touchPressedCard = null;
     };
+    cancelLongPressRef.current = clearTouchPress;
     const scheduleTouchPress = (event: PointerEvent) => {
       clearTouchPress();
       if (event.pointerType === "mouse" || !(event.target instanceof Element) || shouldSuppressTouchPress(event.target)) return;
@@ -663,7 +679,7 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
         viewport.releasePointerCapture(previousPointerId);
       }
       window.clearTimeout(suppressClickTimer);
-      suppressClickTimer = window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+      suppressClickTimer = window.setTimeout(() => { suppressClickRef.current = false; }, longPressConsumed ? 800 : 0);
     };
     /**
      * System takeover and blur only cancel drag-follow movement; they must not commit paging or
@@ -686,6 +702,7 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
     // the drag.
     // 指针阶段：先判定纵向意图，再捕获指针并跟手移动轨道。
     const onPointerDown = (event: PointerEvent) => {
+      if (!event.isPrimary) { clearTouchPress(); return; }
       if (document.hidden || event.button !== 0 || pointerId !== null || paging) return;
       // Decide only from the starting point; moving into the list from the protected area does not
       // transfer control of this touch.
@@ -702,10 +719,23 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
       forwardBlocked = false;
       window.clearTimeout(suppressClickTimer);
       suppressClickRef.current = false;
+      longPressConsumed = false;
       scheduleTouchPress(event);
+      const card = event.target instanceof Element ? event.target.closest<HTMLElement>(".article-card:not([inert])") : null;
+      if (contextMenuRef.current?.enabled && event.pointerType !== "mouse" && card?.dataset.articleId && !card.closest("[inert]")) {
+        const articleId = card.dataset.articleId;
+        longPressTimer = window.setTimeout(() => {
+          clearTouchPress();
+          if (contextMenuRef.current?.enabled && contextMenuRef.current.onLongPress(articleId, startX, startY)) {
+            longPressConsumed = true;
+            suppressClickRef.current = true;
+          }
+        }, 500);
+      }
     };
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return;
+      if (longPressConsumed) { event.preventDefault(); event.stopPropagation(); return; }
       const dy = event.clientY - startY;
       const dx = event.clientX - startX;
       if (Math.hypot(dx, dy) >= DRAG_SLOP) clearTouchPress();
@@ -746,7 +776,8 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
     };
     const onPointerEnd = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return;
-      releaseTouchPress(event.type === "pointerup" && !dragging);
+      window.clearTimeout(longPressTimer);
+      releaseTouchPress(event.type === "pointerup" && !dragging && !longPressConsumed);
       const dy = event.clientY - startY;
       if (dragging) {
         const direction = dy < 0 ? 1 : -1;
@@ -757,6 +788,15 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
     };
     const onPointerCancel = (event: PointerEvent) => {
       if (event.pointerId === pointerId) cancelPointerGesture();
+    };
+    const onAdditionalPointer = (event: PointerEvent) => {
+      if (!event.isPrimary) clearTouchPress();
+    };
+    const onClickCapture = (event: MouseEvent) => {
+      if (!longPressConsumed) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
     };
     const onLostPointerCapture = (event: PointerEvent) => {
       // Touch is implicitly captured by children such as titles before passing to the list. A
@@ -843,7 +883,7 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
     const onKeyDown = (event: KeyboardEvent) => {
       if (document.hidden) return;
       if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (viewport.closest("[inert]") || document.getElementById("mark-read-confirm-popover") || isEditableTarget(event.target)) return;
+      if (viewport.closest("[inert]") || document.querySelector("[role='menu'], .feed-read-confirm") || document.getElementById("mark-read-confirm-popover") || isEditableTarget(event.target)) return;
       const key = event.key.toLowerCase();
       const direction = event.key === "ArrowDown" || event.key === "PageDown" || key === "j"
         ? 1
@@ -884,6 +924,8 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
     // Register all native listeners in the same effect and clean them up in matching pairs.
     // 所有原生监听都在同一个 effect 中注册和成对清理。
     viewport.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("pointerdown", onAdditionalPointer, true);
+    viewport.addEventListener("click", onClickCapture, true);
     viewport.addEventListener("pointermove", onPointerMove, { passive: false });
     viewport.addEventListener("pointerup", onPointerEnd);
     viewport.addEventListener("pointercancel", onPointerCancel);
@@ -906,6 +948,8 @@ export function useArticlePaging(viewportRef: RefObject<HTMLDivElement | null>, 
       cancelPagingCompletion();
       setPaging(false);
       viewport.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointerdown", onAdditionalPointer, true);
+      viewport.removeEventListener("click", onClickCapture, true);
       viewport.removeEventListener("pointermove", onPointerMove);
       viewport.removeEventListener("pointerup", onPointerEnd);
       viewport.removeEventListener("pointercancel", onPointerCancel);

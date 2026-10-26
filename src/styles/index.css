@@ -324,13 +324,13 @@ button { font: inherit; }
   .reader-toolbar.dimmed:hover .reader-tool svg { opacity: 1; }
   .reader-tool:hover { background: var(--color-hover); color: var(--color-ink); }
   .reader-star-tool.starred:hover .reader-star-icon { color: #b9780e; }
-  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover > .article-divider,
-  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover + .article-card > .article-divider,
-  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 0; --article-divider-label-opacity: .25; --article-divider-content-duration: var(--article-divider-fade-out,120ms); }
-  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) > .article-divider { --article-divider-below-background: var(--color-hover); }
-  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) + .article-card > .article-divider,
-  .article-viewport:not(.article-hover-locked) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected)) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-hover); }
-  .article-viewport:not(.article-hover-locked) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; }
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover > .article-divider,
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover + .article-card > .article-divider,
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 0; --article-divider-label-opacity: .25; --article-divider-content-duration: var(--article-divider-fade-out,120ms); }
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) > .article-divider { --article-divider-below-background: var(--color-hover); }
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) + .article-card > .article-divider,
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-group:has(> .article-card:last-child:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected)) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-hover); }
+  .article-viewport:not(.article-hover-locked):not(:has(.context-menu-active)) .article-card:where(:not([data-list-feedback-suppressed="true"] *)):hover:not(.selected) { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover { background: transparent; color: var(--color-accent-600); }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover .read-state-ring { stroke: var(--color-accent-600); }
   .article-viewport:not(.article-hover-locked) .article-read-button:where(:not([data-list-feedback-suppressed="true"] *)):hover .read-state-dot { fill: var(--color-accent-500); }
@@ -749,3 +749,37 @@ button { font: inherit; }
 .timezone-options button[aria-pressed="true"] { background: var(--color-selected); color: var(--color-accent-700); }
 .timezone-options svg { flex: none; }
 .timezone-note { margin: 14px 0 0; font-size: 12px; color: var(--color-muted); }
+
+/* Context selection is independent of reader-return highlighting; closing restores natural hover. */
+.article-card.context-menu-active { border-color: var(--color-border-hover); background: var(--color-hover); box-shadow: none; }
+.article-card.context-menu-active > .article-divider,
+.article-card.context-menu-active + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child.context-menu-active) + .article-group > .article-card:first-child > .article-divider { --article-divider-line-opacity: 0; --article-divider-label-opacity: .25; }
+.article-card.context-menu-active > .article-divider { --article-divider-below-background: var(--color-hover); }
+.article-card.context-menu-active + .article-card > .article-divider,
+.article-group:has(> .article-card:last-child.context-menu-active) + .article-group > .article-card:first-child > .article-divider { --article-divider-above-background: var(--color-hover); }
+.article-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.article-context-menu {
+  --menu-safe-left: env(safe-area-inset-left, 0px); --menu-safe-right: env(safe-area-inset-right, 0px);
+  --menu-safe-top: env(safe-area-inset-top, 0px); --menu-safe-bottom: env(safe-area-inset-bottom, 0px);
+  position: fixed; z-index: 100; width: 176px; min-width: 0;
+  overflow: auto; overscroll-behavior: contain; border: 1px solid var(--color-line); border-radius: 14px;
+  padding: 6px; outline: none; background: var(--color-panel); color: var(--color-ink); box-shadow: var(--shadow-float);
+}
+.article-context-menu > button { display: flex; width: 100%; min-height: 42px; align-items: center; gap: 10px; border: 0; border-radius: 9px; padding: 9px 12px; background: transparent; color: inherit; text-align: left; font-size: 13px; line-height: 20px; white-space: nowrap; cursor: pointer; }
+.article-context-menu > button > svg { flex: none; color: var(--color-muted); }
+.article-context-menu > button > svg.starred { color: #b9780e; }
+.article-context-menu > button:is(:hover,:focus-visible) { outline: none; background: var(--color-hover); }
+.article-context-menu > button:disabled { opacity: .45; cursor: default; background: transparent; }
+.article-context-separator { height: 1px; margin: 5px 6px; background: var(--color-line); }
+.article-context-feed { -webkit-user-select: none; user-select: none; display: flex; max-width: 100%; min-width: 0; align-items: center; justify-content: flex-start; gap: 10px; padding: 8px 12px; font-size: 12px; color: var(--color-muted); }
+.article-context-feed > span { text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-read-confirm-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: rgba(14,24,38,.28); }
+.feed-read-confirm { width: min(380px, 100%); max-height: 100%; overflow: auto; border: 1px solid var(--color-line); border-radius: 20px; padding: 22px; background: var(--color-panel); box-shadow: var(--shadow-float); }
+.feed-read-confirm h2 { margin: 0 0 14px; font-size: 16px; }
+.feed-read-confirm p { margin: 10px 0; color: var(--color-copy); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.feed-read-confirm .feed-read-confirm-name { color: var(--color-ink); font-weight: 600; }
+.feed-read-confirm-actions { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+.feed-read-confirm-actions > button { min-height: 42px; border-radius: 12px; cursor: pointer; }
+.feed-read-confirm-actions > button:first-child { flex: none; padding: 0 18px; border: 1px solid var(--color-line); background: var(--color-control); }
+.feed-read-confirm-actions > button:disabled { opacity: .6; cursor: wait; }
