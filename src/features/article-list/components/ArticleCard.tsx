@@ -16,7 +16,7 @@ type Props = {
   starShortcutNumber?: number;
   highlightPhase: "idle" | "reading" | "holding" | "releasing";
   onHighlightEnd: () => void;
-  onOpen: () => void;
+  onOpen: (openOriginal: boolean) => void;
   onToggleRead: () => void;
   onToggleStar: () => void;
   onLayoutChange: (articleId: string, layout: ArticleCardLayout) => void;
@@ -39,7 +39,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
     heightClass: getHeightClass(titleFitsOneLine),
     titleFitsOneLine,
   };
-  const open = () => { if (!suppressClick()) onOpen(); };
+  const open = (openOriginal = false) => { if (!suppressClick()) onOpen(openOriginal); };
 
   useLayoutEffect(() => {
     const measureElement = titleMeasureRef.current;
@@ -90,7 +90,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
       aria-hidden={!active}
       aria-label={`打开文章：${article.title}`}
       inert={!active}
-      onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(); }}
+      onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(event.ctrlKey || event.metaKey); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
     >
       <span className="article-divider" data-time-tone={timeSectionLabel?.tone} aria-hidden="true">{timeSectionLabel ? <span className="article-time-section"><span className="article-time-section-text">{timeSectionLabel.label}</span></span> : null}</span>
