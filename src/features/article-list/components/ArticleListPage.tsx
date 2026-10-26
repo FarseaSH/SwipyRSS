@@ -1,3 +1,4 @@
+import type { TimeSection } from "../timeSections";
 import { ArrowUpToLine, CheckCheck, ChevronsRight, CornerLeftUp, Inbox, Menu, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { getBottomToolbar } from "@/components/toolbarGeometry";
@@ -39,7 +40,7 @@ const EMPTY_PAGE: ArticlePage = {
 type Props = {
   articles: Article[];
   listNow: number;
-  timeSectionLabels: ReadonlyMap<string, string | undefined>;
+  timeSectionLabels: ReadonlyMap<string, TimeSection | undefined>;
   feeds: Feed[];
   refreshKey: number;
   mode: ArticleMode;

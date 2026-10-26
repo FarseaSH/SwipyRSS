@@ -2,11 +2,11 @@ import { deviceTimeZone, zonedDate } from "@/lib/time/articleTime";
 import type { Article } from "@/types";
 
 type TimedArticle = Pick<Article, "id" | "publishedAt">;
-type TimeSection = { label: string; order: number };
+export type TimeSection = { label: string; order: number; tone: "recent" | "older" };
 
 export type TimeSectionState = {
   context: string;
-  labels: ReadonlyMap<string, string | undefined>;
+  labels: ReadonlyMap<string, TimeSection | undefined>;
   lastSection: TimeSection | null;
 };
 
@@ -22,13 +22,13 @@ export function getTimeSection(time: number, now: number, timeZone = deviceTimeZ
   const daysAgo = today.dayNumber - day;
   if (daysAgo <= 1) {
     const slot = Math.floor(Number(date.time.slice(0, 2)) / 6);
-    return { label: `${daysAgo === 0 ? "今天" : "昨天"}${["凌晨", "早上", "下午", "晚上"][slot]}`, order: day * 4 + slot };
+    return { label: `${daysAgo === 0 ? "今天" : "昨天"}${["凌晨", "早上", "下午", "晚上"][slot]}`, order: day * 4 + slot, tone: "recent" };
   }
   if (daysAgo <= 6) {
     const prefix = daysAgo <= (today.weekday + 6) % 7 ? "周" : "上周";
-    return { label: `${prefix}${["日", "一", "二", "三", "四", "五", "六"][date.weekday]}`, order: day * 4 };
+    return { label: `${prefix}${["日", "一", "二", "三", "四", "五", "六"][date.weekday]}`, order: day * 4, tone: "older" };
   }
-  return { label: "更早", order: -Infinity };
+  return { label: "更早", order: -Infinity, tone: "older" };
 }
 
 /** A focus event within the same calendar day must not rebuild frozen sections. */
@@ -37,7 +37,7 @@ export function getTimeSectionContext(revision: number, now: number, timeZone = 
 }
 
 /**
- * Freeze both label text and article IDs. Only unseen articles form the next suffix-max batch;
+ * Freeze label text, tone and article IDs together. Only unseen articles form the next suffix-max batch;
  * read/star updates and removals cannot move an existing boundary. A successful list replacement
  * or a calendar/time-zone change supplies a new context and rebuilds the timeline.
  * 冻结文案及其所在文章；每批新文章独立逆向求最新时间，只允许向更早区间推进。
@@ -69,16 +69,16 @@ export function updateTimeSections(
   const labels = new Map(current?.labels);
   let lastSection = current?.lastSection ?? null;
   added.forEach((article, index) => {
-    let label: string | undefined;
+    let section: TimeSection | undefined;
     // Unknown dates neither participate nor host a boundary, even when later dates are known.
     if (validTime(article.publishedAt) && suffixTimes[index] !== undefined) {
       const candidate = getTimeSection(suffixTimes[index]!, now, timeZone)!;
       if (!lastSection || candidate.order < lastSection.order) {
         lastSection = candidate;
-        label = candidate.label;
+        section = candidate;
       }
     }
-    labels.set(article.id, label);
+    labels.set(article.id, section);
   });
   return { context, labels, lastSection };
 }

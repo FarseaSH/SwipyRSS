@@ -204,16 +204,20 @@ button { font: inherit; }
 /* Labels live on the existing boundary without changing any card's fixed height. */
 .article-divider { position: absolute; top: -8px; right: 16px; left: 16px; z-index: 2; display: flex; height: 16px; align-items: center; gap: 8px; pointer-events: none; }
 .article-divider::before, .article-divider::after { height: 1px; flex: 1; background: var(--color-line); opacity: var(--article-divider-line-opacity,1); content: ""; }
+/* Only time boundaries use the stronger line; the tone belongs to the frozen section. */
+.article-divider[data-time-tone] { --article-time-text: #6a7485; --article-time-fill: var(--color-control); --article-time-line: #cbd3dd; }
+.article-divider[data-time-tone="recent"] { --article-time-text: #456286; --article-time-fill: var(--color-selected); --article-time-line: #b6cce3; }
+.article-divider[data-time-tone]::before, .article-divider[data-time-tone]::after { height: 2px; background: var(--article-time-line); }
 /* Match the source icon's left edge: card padding + action column + column gap - divider inset - label gap. */
 .article-divider:not(:empty)::before { flex: 0 0 18px; }
 .article-divider:empty { gap: 0; }
-.article-time-section { position: relative; isolation: isolate; flex: none; color: #6a7485; font-size: 11px; font-weight: 400; line-height: 16px; white-space: nowrap; }
+.article-time-section { position: relative; isolation: isolate; flex: none; color: var(--article-time-text); font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap; }
 /* Keep the border gap opaque independently of text opacity. Each half follows the card on its
  * side of the boundary, including when the highlighted card is above the label. */
 .article-time-section::before, .article-time-section::after { position: absolute; z-index: -1; right: -8px; left: -8px; height: 50%; content: ""; transition: background-color var(--article-divider-cover-duration,var(--article-divider-fade-in,180ms)) ease; }
 .article-time-section::before { top: 0; background-color: var(--article-divider-above-background,var(--color-canvas)); }
 .article-time-section::after { bottom: 0; background-color: var(--article-divider-below-background,var(--color-canvas)); }
-.article-time-section-text { opacity: var(--article-divider-label-opacity,1); }
+.article-time-section-text { display: block; border-radius: 7px; padding-inline: 8px; background: var(--article-time-fill); opacity: var(--article-divider-label-opacity,1); }
 /* Hover and return highlighting keep a faint time label while the two line segments fade away. */
 .article-divider::before, .article-divider::after, .article-time-section-text { transition: opacity var(--article-divider-content-duration,var(--article-divider-fade-in,180ms)) ease-out; }
 .article-card:is(.selected,.touch-pressed,.reading-highlight) > .article-divider,
