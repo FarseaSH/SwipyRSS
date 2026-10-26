@@ -3,6 +3,11 @@ export function secondRowScrollTop(itemTop: number, rowHeight: number, scrollHei
   return Math.max(0, Math.min(itemTop - rowHeight, Math.max(0, scrollHeight - viewportHeight)));
 }
 
+/** Leave one full folder row and a partial row above the selected folder. */
+export function folderScrollTop(itemTop: number, rowPitch: number, scrollHeight: number, viewportHeight: number) {
+  return secondRowScrollTop(itemTop, rowPitch * 1.5, scrollHeight, viewportHeight);
+}
+
 /** A gentle start/stop allowance plus travel time, with no maximum duration. */
 export function sidebarScrollDuration(distance: number) {
   return distance === 0 ? 0 : 160 + Math.abs(distance) * 1.2;

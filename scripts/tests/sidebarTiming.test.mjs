@@ -7,7 +7,7 @@ import ts from "typescript";
 // Exercise the real Sidebar effects with a controllable drawer animation, rather than
 // relying on elapsed timers or a browser's background-tab rendering policy.
 const source = readFileSync(new URL("../../src/features/subscriptions/components/Sidebar.tsx", import.meta.url), "utf8");
-function setup(mobile = true) {
+function setup(mobile = true, folderTop = 0) {
   let hooks = [], cursor = 0, effects = [], dirty = false, frames = new Map(), nextFrame = 0;
   let finishClosing;
   let now = 0;
@@ -17,7 +17,7 @@ function setup(mobile = true) {
   const closing = { playState: "running", finished: new Promise(resolve => { finishClosing = () => { closing.playState = "finished"; resolve(); }; }) };
   const viewport = { scrollTop: 0, scrollHeight: 396, clientHeight: 180, getBoundingClientRect: () => ({ top: 0 }) };
   const feed = { dataset: { feedId: "feed7" }, offsetHeight: 36, getBoundingClientRect: () => ({ top: 216 - viewport.scrollTop }) };
-  const row = { offsetHeight: 36, getBoundingClientRect: () => ({ top: 0 }) };
+  const row = { offsetHeight: 36, getBoundingClientRect: () => ({ top: folderTop - area.scrollTop }) };
   const group = { dataset: { folderId: "folder" }, querySelector: selector => selector === ".sidebar-folder-row" ? row : viewport, querySelectorAll: () => [feed] };
   const area = { scrollTop: 0, scrollHeight: 500, clientHeight: 400, getBoundingClientRect: () => ({ top: 0 }), querySelectorAll: () => [group], getAnimations: () => treeAnimations, addEventListener(name, callback) { listeners.set(name, callback); }, removeEventListener(name) { listeners.delete(name); } };
   const drawer = { getAnimations: () => [closing] };
@@ -49,7 +49,7 @@ function setup(mobile = true) {
     } while (dirty);
   }
   render();
-  return { render, viewport, finishClosing,
+  return { render, viewport, area, finishClosing,
     collapse() { hooks[0].value = new Set(); render(); },
     advance(time) { now += time; const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); },
     interrupt() { listeners.get("wheel")?.(); },
@@ -174,4 +174,16 @@ test("manual input stops scrolling and releases the height transition from its c
   app.viewport.scrollTop = 42;
   app.advance(1000);
   assert.equal(app.viewport.scrollTop, 42);
+});
+
+
+test("folder selection changes only the outer offset; Feed selection retains second-row placement", () => {
+  const app = setup(false, 120);
+  app.render({ selectedFolderId: "folder" });
+  app.advance(1000);
+  assert.equal(app.area.scrollTop, 60);
+  app.select();
+  app.advance(1000);
+  assert.equal(app.area.scrollTop, 80);
+  assert.equal(app.viewport.scrollTop, 180);
 });

@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight, CircleDot, Inbox, Rss, Star, TriangleAlert, 
 import { VersionControls } from "@/features/versions/components/VersionControls";
 import { useLayoutEffect, useRef, useState } from "react";
 import { SidebarFeedList } from "./SidebarFeedList";
-import { secondRowScrollTop, sidebarScrollDuration, sidebarMotionProgress } from "./sidebarScroll";
+import { folderScrollTop, secondRowScrollTop, sidebarScrollDuration, sidebarMotionProgress } from "./sidebarScroll";
 import { UnreadCountBadge } from "@/components/UnreadCountBadge";
 import type { ArticleMode, Feed, FeedFolder } from "@/types";
 
@@ -125,7 +125,9 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
       const innerEnd = viewport && activeFeed
         ? secondRowScrollTop(activeFeed.getBoundingClientRect().top - viewport.getBoundingClientRect().top + innerStart, activeFeed.offsetHeight, viewport.scrollHeight, viewport.clientHeight)
         : innerStart;
-      const outerEnd = secondRowScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + outerStart, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
+      // Feed selection keeps its existing second-row placement in both scroll areas.
+      const outerScrollTop = selectedFeedId ? secondRowScrollTop : folderScrollTop;
+      const outerEnd = outerScrollTop(row.getBoundingClientRect().top - area.getBoundingClientRect().top + outerStart, row.offsetHeight + 4, area.scrollHeight, area.clientHeight);
       for (const { animation, start } of motions) animation.currentTime = start;
       area.scrollTop = outerStart;
       const started = performance.now();
