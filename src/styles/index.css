@@ -783,3 +783,8 @@ button { font: inherit; }
 .feed-read-confirm-actions > button { min-height: 42px; border-radius: 12px; cursor: pointer; }
 .feed-read-confirm-actions > button:first-child { flex: none; padding: 0 18px; border: 1px solid var(--color-line); background: var(--color-control); }
 .feed-read-confirm-actions > button:disabled { opacity: .6; cursor: wait; }
+
+/* Settings reserves horizontal touch gestures for sidebar navigation; vertical scrolling stays native. */
+@media (max-width: 1023px) {
+  .settings-page { touch-action: pan-y pinch-zoom; }
+}

@@ -553,13 +553,14 @@ export default function App({ platform }: { platform: AppPlatform }) {
     mainRef,
     drawerRef,
     backdropRef,
-    (Boolean(connection) || previewMode) && view === "list",
+    (Boolean(connection) || previewMode) && (view === "list" || view === "settings"),
     sidebarOpen,
     listHorizontalBlockKey,
     openSidebar,
     closeSidebar,
-    canReopenReader,
+    view === "list" && canReopenReader,
     reopenReader,
+    view === "settings" ? "settings" : "list",
   );
 
   useEffect(() => {
