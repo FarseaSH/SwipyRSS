@@ -36,7 +36,7 @@ export function SettingsPage({ connectionDefaults, connection, configured, start
   }), [connection, connectionDefaults]);
 
   return (
-    <section className="flex h-dvh min-w-0 flex-col bg-canvas">
+    <section className="settings-page flex h-dvh min-w-0 flex-col bg-canvas">
       <header className="app-header sticky top-0 z-30 grid h-16 flex-none grid-cols-[1fr_auto_1fr] items-center border-b px-4 backdrop-blur-xl sm:px-6">
         <div className="justify-self-start"><button className="icon-button lg:hidden" onClick={onOpenSidebar} aria-label="打开侧边栏"><Menu size={20}/></button></div>
         <h1 className="m-0 text-[16px] font-bold tracking-[-.02em]">设置</h1>

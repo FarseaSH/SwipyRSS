@@ -20,7 +20,7 @@ function isNativeHorizontalScrollTarget(target: EventTarget | null) {
 }
 
 /**
- * Manage two horizontal list gestures: swipe right to open the sidebar and left to restore the
+ * Manage settings sidebar navigation and two horizontal list gestures: swipe right to open the sidebar and left to restore the
  * recently closed reader. Navigation marked data-native-horizontal-scroll takes priority so swiping
  * its tabs cannot trigger global page actions.
  *
@@ -40,6 +40,7 @@ export function useSidebarSwipe(
   close: () => void,
   canReopenReader: boolean,
   reopenReader: () => void,
+  page: "list" | "settings" = "list",
 ) {
   const horizontalGestureBlockedRef = useRef(false);
   const horizontalGestureQuietTimerRef = useRef(0);
@@ -96,6 +97,20 @@ export function useSidebarSwipe(
       suppressClickTimerRef.current = window.setTimeout(() => {
         suppressNextClickRef.current = false;
       }, 400);
+    };
+    // Settings keeps native controls and modal interactions ahead of page navigation.
+    const settingsGestureBlocked = (target: EventTarget | null) => page === "settings" && (
+      Boolean(main.ownerDocument.querySelector('dialog[open], [aria-modal="true"], .settings-select-menu'))
+      || (target instanceof Element && Boolean(target.closest(
+        'input, textarea, select, button, a, label, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="listbox"], [data-native-horizontal-scroll]',
+      )))
+    );
+    let settingsPointerId: number | null = null;
+    const releaseSettingsPointer = () => {
+      if (settingsPointerId !== null && main.hasPointerCapture(settingsPointerId)) {
+        main.releasePointerCapture(settingsPointerId);
+      }
+      settingsPointerId = null;
     };
     // Wait until pointer movement exceeds the threshold before choosing between sidebar navigation
     // and reader restoration.
@@ -271,6 +286,16 @@ export function useSidebarSwipe(
     };
     const down = (event: PointerEvent) => {
       if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+      if (page === "settings") {
+        if (!event.isPrimary) {
+          tracking = false;
+          direction = null;
+          releaseSettingsPointer();
+          return;
+        }
+        if (tracking || settingsGestureBlocked(event.target)) return;
+        settingsPointerId = event.pointerId;
+      }
       if (isNativeHorizontalScrollTarget(event.target)) {
         reportGestureDebug("忽略：来源标签保留原生横向滚动");
         return;
@@ -284,7 +309,7 @@ export function useSidebarSwipe(
       velocity = 0;
     };
     const move = (event: PointerEvent) => {
-      if (!tracking) return;
+      if (!tracking || (page === "settings" && event.pointerId !== settingsPointerId)) return;
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
       if (!direction && Math.max(Math.abs(dx), Math.abs(dy)) > 8) {
@@ -297,6 +322,16 @@ export function useSidebarSwipe(
       }
       if (!direction) return;
       event.preventDefault();
+      if (page === "settings") {
+        if (settingsGestureBlocked(event.target)) {
+          tracking = false;
+          direction = null;
+          releaseSettingsPointer();
+          return;
+        }
+        if (!main.hasPointerCapture(event.pointerId)) main.setPointerCapture(event.pointerId);
+        suppressNextClick();
+      }
       const now = performance.now();
       velocity = (event.clientX - lastX) / Math.max(1, now - lastTime);
       lastX = event.clientX;
@@ -310,6 +345,8 @@ export function useSidebarSwipe(
         }
         return;
       }
+      // Settings swipes only trigger the existing opening animation on release.
+      if (page === "settings") return;
       const progress = Math.max(0, Math.min(1, dx / 284));
       const drawer = drawerRef.current;
       const backdrop = backdropRef.current;
@@ -320,7 +357,13 @@ export function useSidebarSwipe(
       }
     };
     const up = (event: PointerEvent) => {
-      if (!tracking) return;
+      if (!tracking || (page === "settings" && event.pointerId !== settingsPointerId)) return;
+      if (settingsGestureBlocked(event.target)) {
+        tracking = false;
+        direction = null;
+        releaseSettingsPointer();
+        return;
+      }
       const dx = event.clientX - startX;
       reportGestureDebug(event.type === "pointercancel"
         ? `pointercancel · 方向=${direction ?? "未确定"}`
@@ -329,14 +372,17 @@ export function useSidebarSwipe(
         settleReader(event.type === "pointerup" && (-dx > 84 || velocity < -0.55));
       } else if (direction === "sidebar" && event.type === "pointerup" && (dx > 84 || velocity > 0.55)) {
         reportGestureDebug("达到阈值，调用打开侧边栏");
+        if (page === "settings") suppressNextClick();
         open();
-        window.requestAnimationFrame(resetPreview);
+        if (page === "list") window.requestAnimationFrame(resetPreview);
       } else { reportGestureDebug("撤销预览：手势取消或未达到阈值"); resetPreview(); }
       tracking = false;
       direction = null;
+      releaseSettingsPointer();
     };
 
     const wheel = (event: WheelEvent) => {
+      if (settingsGestureBlocked(event.target)) return;
       const horizontalIntent = Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.1;
       if (!horizontalIntent || event.deltaX === 0) return;
       // The same momentum after closing the drawer must not trigger the list's left-swipe reader
@@ -444,6 +490,7 @@ export function useSidebarSwipe(
       window.clearTimeout(forwardAnimationTimer);
       window.clearTimeout(sidebarIdleTimer);
       window.cancelAnimationFrame(forwardSettleFrame);
+      releaseSettingsPointer();
       resetPreview();
       clearReaderPreview();
       main.removeEventListener("pointerdown", down);
@@ -452,5 +499,5 @@ export function useSidebarSwipe(
       main.removeEventListener("pointercancel", up);
       main.removeEventListener("wheel", wheel);
     };
-  }, [backdropRef, canReopenReader, close, drawerRef, enabled, mainRef, open, reopenReader, sidebarOpen]);
+  }, [backdropRef, canReopenReader, close, drawerRef, enabled, mainRef, open, page, reopenReader, sidebarOpen]);
 }
