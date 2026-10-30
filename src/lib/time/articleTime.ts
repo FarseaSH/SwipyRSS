@@ -1,17 +1,32 @@
 /** Calendar arithmetic uses the selected zone's civil dates, never 24-hour elapsed days. */
 const formatters = new Map<string, Intl.DateTimeFormat>();
 export function deviceTimeZone() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
+  return detectDeviceTimeZone().timeZone;
 }
-export function validTimeZone(value: string) {
+/** Keep detection failure separate from a device legitimately configured to UTC. */
+export function detectDeviceTimeZone() {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (validTimeZone(timeZone)) return { timeZone, fallback: false };
+  } catch { /* Retry device detection on the next clock update. */ }
+  return { timeZone: "UTC", fallback: true };
+}
+export function validTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) return false;
   try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
 }
 export function zonedDate(milliseconds: number, timeZone: string) {
   let formatter = formatters.get(timeZone);
   if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-GB-u-ca-gregory-nu-latn", {
-      timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    const create = (zone: string) => new Intl.DateTimeFormat("en-GB-u-ca-gregory-nu-latn", {
+      timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
     });
+    try { formatter = create(timeZone); }
+    catch {
+      formatter = formatters.get("UTC") ?? create("UTC");
+      formatters.set("UTC", formatter);
+    }
+    // Cache the fallback under the original input too, avoiding repeated exceptions per article.
     formatters.set(timeZone, formatter);
   }
   const parts = Object.fromEntries(formatter.formatToParts(milliseconds).map(({ type, value }) => [type, value]));
