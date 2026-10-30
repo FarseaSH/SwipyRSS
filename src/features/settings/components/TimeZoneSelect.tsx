@@ -2,7 +2,7 @@ import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useArticleTime } from "@/lib/time/ArticleTimeProvider";
 import { fallbackTimeZones } from "@/lib/time/timeZones";
-import { deviceTimeZone, validTimeZone } from "@/lib/time/articleTime";
+import { validTimeZone } from "@/lib/time/articleTime";
 
 const cityNames: Record<string, string> = {
   "Asia/Shanghai": "上海 北京", "Asia/Hong_Kong": "香港", "Asia/Taipei": "台北", "Asia/Tokyo": "东京", "Asia/Singapore": "新加坡",
@@ -17,14 +17,14 @@ function zoneLabel(zone: string, now: number) {
   return `${cityNames[zone] ?? name ?? zone} · ${zone} (${offset})`;
 }
 export function TimeZoneSelect() {
-  const { preference, timeZone, now, setPreference } = useArticleTime();
+  const { preference, timeZone, deviceTimeZone, deviceTimeZoneFallback, now, setPreference } = useArticleTime();
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState("");
   const options = useMemo(() => {
     const supported = (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
-    const zones = [...new Set(["UTC", deviceTimeZone(), timeZone, ...(supported ? supported("timeZone") : fallbackTimeZones)])].filter(validTimeZone).sort();
-    return [{ value: "auto", label: `自动跟随设备 · ${deviceTimeZone()}` }, ...zones.map(zone => ({ value: zone, label: zoneLabel(zone, now) }))];
-  }, [now, timeZone]);
+    const zones = [...new Set(["UTC", deviceTimeZone, timeZone, ...(supported ? supported("timeZone") : fallbackTimeZones)])].filter(validTimeZone).sort();
+    return [{ value: "auto", label: `自动跟随设备 · ${deviceTimeZone}` }, ...zones.map(zone => ({ value: zone, label: zoneLabel(zone, now) }))];
+  }, [now, timeZone, deviceTimeZone]);
   const filtered = options.filter(option => option.label.toLowerCase().includes(query.trim().toLowerCase().replaceAll(" ", "_")) || option.label.toLowerCase().includes(query.trim().toLowerCase()));
   const choose = (value: string) => { setPreference(value); dialog.current?.close(); };
   return <div className="timezone-field settings-field">
@@ -33,6 +33,7 @@ export function TimeZoneSelect() {
       aria-labelledby="display-timezone-label display-timezone-value" onClick={() => { setQuery(""); dialog.current?.showModal(); }}>
       <span id="display-timezone-value">{preference === "auto" ? `自动跟随设备（${timeZone}）` : zoneLabel(timeZone, now)}</span><ChevronDown size={17}/>
     </button>
+    {preference === "auto" && deviceTimeZoneFallback && <p role="status">无法识别设备时区，已临时使用 UTC。可以手动选择时区。</p>}
     <p>仅调整文章发布时间的显示，不影响文章排序和原始数据。设置保存在当前设备。</p>
     <dialog ref={dialog} className="timezone-dialog" aria-labelledby="timezone-dialog-title" onClick={event => { if (event.target === dialog.current) dialog.current?.close(); }}>
       <div className="timezone-dialog-header"><h3 id="timezone-dialog-title">选择显示时区</h3><button type="button" className="icon-button" aria-label="关闭时区选择" onClick={() => dialog.current?.close()}><X size={18}/></button></div>
