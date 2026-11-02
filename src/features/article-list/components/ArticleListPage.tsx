@@ -1084,7 +1084,13 @@ export function ArticleListPage(props: Props) {
       {contextMenu.menu && contextArticle ? <ArticleContextMenu
         anchor={contextMenu.menu} article={contextArticle} feed={feedsById.get(contextArticle.feedId)}
         mixed={!props.selectedFeed} canMarkAbove={contextAboveIds.length > 0} menuRef={contextMenu.menuRef}
+        feedUnreadCount={props.feedUnreadCounts[contextArticle.feedId] ?? feedsById.get(contextArticle.feedId)?.unreadCount ?? 0}
         onClose={contextMenu.close}
+        onOpenOriginal={() => {
+          if (!contextArticle.articleUrl?.trim()) return;
+          props.onOpenExternal(contextArticle.articleUrl);
+          props.onMarkRead([contextArticle.id]);
+        }}
         onStar={() => props.onToggleStar(contextArticle.id)}
         onMarkAbove={() => {
           void props.onMarkAboveRead(contextAboveIds).then(() => setToolbarNotice(`该条及上方 ${contextAboveIds.length} 篇已标记为已读`)).catch(() => setToolbarNotice("标记已读失败，已恢复原状态"));
