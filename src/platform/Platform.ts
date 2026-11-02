@@ -15,8 +15,10 @@ export type ExternalArticleViewProps = {
  * Open articles externally or supply an embedded view without exposing a native SDK to the app.
  * 在外部打开文章或提供内嵌视图，不让公共应用依赖原生 SDK。
  */
+export type ExternalArticleOpenOptions = { preferForeground?: boolean };
+
 export type ExternalArticles =
-  | { kind: "external"; open: (url: string) => Promise<void> }
+  | { kind: "external"; open: (url: string, options?: ExternalArticleOpenOptions) => Promise<void> }
   | { kind: "embedded"; View: ComponentType<ExternalArticleViewProps> };
 
 /**

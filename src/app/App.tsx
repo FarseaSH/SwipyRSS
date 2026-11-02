@@ -10,7 +10,7 @@ import { feedFolders as previewFolders, previewFeeds } from "@/features/preview/
 import { ReaderPage } from "@/features/reader/components/ReaderPage";
 import { SettingsPage } from "@/features/settings/components/SettingsPage";
 import { Sidebar } from "@/features/subscriptions/components/Sidebar";
-import type { AppPlatform } from "@/platform/Platform";
+import type { AppPlatform, ExternalArticleOpenOptions } from "@/platform/Platform";
 import { normalizeRssError } from "@/services/rss/errors";
 import type {
   AppView,
@@ -1630,9 +1630,9 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * Delegate article opening to the selected platform, optionally displaying its embedded view.
    * 将原文打开方式交给所选平台；平台提供内嵌视图时在应用中展示。
    */
-  const openExternal = useCallback((url: string) => {
+  const openExternal = useCallback((url: string, options?: ExternalArticleOpenOptions) => {
     if (externalArticles.kind === "external") {
-      void externalArticles.open(url).catch((error) => notify(normalizeRssError(error).message));
+      void externalArticles.open(url, options).catch((error) => notify(normalizeRssError(error).message));
       return;
     }
     setExternalUrl(url);
