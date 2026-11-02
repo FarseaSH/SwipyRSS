@@ -304,6 +304,31 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [connection, setConnection] = useState<SavedFreshRssConnection | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [starting, setStarting] = useState(true);
+  const [restarting, setRestarting] = useState(false);
+  const restartRequestedRef = useRef(false);
+  const pendingWritesRef = useRef(new Set<Promise<unknown>>());
+  const trackWrite = useCallback(async <T,>(write: Promise<T>): Promise<T> => {
+    pendingWritesRef.current.add(write);
+    try {
+      return await write;
+    } finally {
+      pendingWritesRef.current.delete(write);
+    }
+  }, []);
+  const restartApp = useCallback(async () => {
+    if (restartRequestedRef.current) return;
+    restartRequestedRef.current = true;
+    setRestarting(true);
+    // Finish writes already submitted before unloading the page. The restart screen
+    // prevents further interactions while the existing error handlers finish.
+    await Promise.allSettled([...pendingWritesRef.current]);
+    const current = window.history.state;
+    if (current && typeof current === "object" && !Array.isArray(current)) {
+      const { __swipyrssReader: _reader, ...state } = current;
+      window.history.replaceState(state, "");
+    }
+    window.location.reload();
+  }, []);
   // Preserve session state across list unmounts only; expanding or collapsing the toolbar does not
   // rerender App.
   // 只跨列表卸载保存会话状态；展开/收起不触发 App 渲染。
@@ -730,7 +755,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setLoadingMore(false);
 
     try {
-      const saved = await rssClient.saveConnection(input);
+      const saved = await trackWrite(rssClient.saveConnection(input));
       const modeStorageKey = getArticleModeStorageKey(saved, false);
       const scopeStorageKey = getListScopeStorageKey(saved, false);
       const savedModes = loadArticleModes(modeStorageKey);
@@ -764,7 +789,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } catch (error) {
       throw new Error(normalizeRssError(error).message);
     }
-  }, [beginReadingSession, notify, rssClient, replaceArticleList]);
+  }, [beginReadingSession, notify, rssClient, replaceArticleList, trackWrite]);
 
   /**
    * Load mock data through the standard DTOs so both browsers and native shells can enter preview
@@ -1028,7 +1053,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     unreadMutationVersionRef.current += 1;
 
     try {
-      await rssClient.markStreamRead({ streamId, beforeTimestampUsec });
+      await trackWrite(rssClient.markStreamRead({ streamId, beforeTimestampUsec }));
       if (listSequence !== requestSequenceRef.current) {
         void reconcileUnreadCounts(false);
         return;
@@ -1094,7 +1119,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } finally {
       if (listSequence === requestSequenceRef.current) setLoadingList(false);
     }
-  }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient, replaceArticleList]);
+  }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient, replaceArticleList, trackWrite]);
 
   /** Mark exactly one Feed, including its unloaded entries, without changing the selected scope. */
   const markFeedRead = useCallback(async (feedId: string) => {
@@ -1136,7 +1161,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setLoadingList(true);
     unreadMutationVersionRef.current += 1;
     try {
-      await rssClient.markStreamRead({ streamId: feedId, beforeTimestampUsec });
+      await trackWrite(rssClient.markStreamRead({ streamId: feedId, beforeTimestampUsec }));
       // Older per-article failures must not roll back this successful bulk write.
       const operationId = ++mutationSequenceRef.current;
       for (const article of articles.filter(belongsToOperation)) latestMutationRef.current.set(`read:${article.id}`, operationId);
@@ -1191,7 +1216,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } finally {
       if (listSequence === requestSequenceRef.current) setLoadingList(false);
     }
-  }, [scope, mode, previewMode, continuation, articles, feedUnreadCounts, applyPreviewScope, beginReadingSession, recordFeedsMarkedRead, reconcileUnreadCounts, rssClient, notify]);
+  }, [scope, mode, previewMode, continuation, articles, feedUnreadCounts, applyPreviewScope, beginReadingSession, recordFeedsMarkedRead, reconcileUnreadCounts, rssClient, notify, trackWrite]);
 
   /**
    * Submit final article states and use a separate operation sequence for each field to handle
@@ -1325,12 +1350,12 @@ export default function App({ platform }: { platform: AppPlatform }) {
     // Part 2: in live mode, send explicit final states to the current RSS adapter.
     // 第二部分：真实模式把明确的最终状态发送到当前 RSS 适配器。
     try {
-      const result = await rssClient.editEntryStates({
+      const result = await trackWrite(rssClient.editEntryStates({
         articleIds,
         read: field === "read" ? value : undefined,
         starred: field === "starred" ? value : undefined,
         operationId,
-      });
+      }));
       recordFeedsMarkedRead(newlyReadFeedIds);
 
       // Avoid extra requests after ordinary successful writes; reconcile silently only after
@@ -1404,7 +1429,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       void reconcileUnreadCounts(false);
       return false;
     }
-  }, [articles, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, rssClient]);
+  }, [articles, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, rssClient, trackWrite]);
 
   /**
    * Toggle the read state of one article.
@@ -1652,8 +1677,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setExternalUrl(null);
   }, [notify]);
 
-  if (starting) {
-    return <main className="grid h-dvh place-items-center bg-canvas text-sm text-muted">正在恢复 SwipyRSS…</main>;
+  if (starting || restarting) {
+    return <main className="grid h-dvh place-items-center bg-canvas text-sm text-muted">{restarting ? "正在重新启动 SwipyRSS…" : "正在恢复 SwipyRSS…"}</main>;
   }
 
   if (!connection && !previewMode) {
@@ -1677,6 +1702,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
           apiConfigured={Boolean(connection)}
           settingsActive={view === "settings"}
           onClose={closeSidebar}
+          onRestart={restartApp}
           onOpenSettings={openSettings}
           onSelectMode={(nextMode) => selectScope(READING_LIST_SCOPE, nextMode)}
           onSelectStarred={() => selectScope({ kind: "starred" })}
