@@ -468,7 +468,7 @@ button { font: inherit; }
 .reader-article-nav-button:disabled { opacity: .34; cursor: default; }
 .reader-document { --reader-paragraph-gap: 20px; --reader-bottom-clearance: 128px; position: relative; padding: max(88px,calc(env(safe-area-inset-top) + 68px)) 20px calc(var(--reader-bottom-clearance) + env(safe-area-inset-bottom)); }
 .reader-copy { width: 100%; min-width: 0; max-width: 720px; margin: auto; color: #304158; font-size: 17px; line-height: 1.82; }
-.reader-document[data-long-article="true"] { padding-bottom: calc(clamp(180px,35dvh,360px) + env(safe-area-inset-bottom)); }
+.reader-document[data-long-article="true"] { padding-bottom: calc(clamp(180px,30dvh,360px) + env(safe-area-inset-bottom)); }
 .reader-ending { display: flex; justify-content: flex-end; margin-top: var(--reader-paragraph-gap); line-height: 1; pointer-events: none; user-select: none; }
 .reader-ending-logo { display: grid; width: 1em; height: 1em; place-items: center; border-radius: .375em; background: var(--color-ink); color: white; opacity: .65; }
 .reader-ending-logo svg { width: .53125em; height: .53125em; }
