@@ -905,8 +905,8 @@ export function ArticleListPage(props: Props) {
     }
   };
   /**
-   * Switch scopes in stable sidebar ID order and show the result.
-   * 按侧边栏的稳定 ID 顺序切换范围，并展示切换结果。
+   * Switch scopes in stable sidebar ID order without a notification for manual toolbar navigation.
+   * 手动点击工具栏按侧边栏顺序切换，不弹通知；批量已读后的自动切换提示由 App 管理。
    */
   const goToNextList = () => {
     if (props.toolbarPosition !== "bottom") {
@@ -917,9 +917,6 @@ export function ArticleListPage(props: Props) {
     // unrelated navigation.
     // 到达末尾时没有列表变化，不能把保留标记留给下一次无关导航。
     if (!target) toolbarNavigationOriginRef.current = null;
-    props.onToast(target
-      ? `已切换到${target.kind === "folder" ? "文件夹组 " : " "}${target.name}`
-      : `已经是最后一个${props.selectedFeed ? " Feed" : "文件夹组"}`);
   };
 
   /**
