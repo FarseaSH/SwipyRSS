@@ -10,7 +10,6 @@ type Props = {
   listNow: number;
   timeSectionLabel?: TimeSection;
   article: Article;
-  feedIconUrl?: string;
   active: boolean;
   contextMenuActive: boolean;
   onContextMenu: (x: number, y: number) => void;
@@ -29,7 +28,7 @@ type Props = {
  * Render one article with a static feed label and independent read/star actions.
  * 渲染单篇文章，来源标签随卡片打开正文，已读和收藏操作保持独立。
  */
-export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, active, contextMenuActive, onContextMenu, shortcutNumber, starShortcutNumber, highlightPhase, onHighlightEnd, onOpen, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
+export function ArticleCard({ listNow, timeSectionLabel, article, active, contextMenuActive, onContextMenu, shortcutNumber, starShortcutNumber, highlightPhase, onHighlightEnd, onOpen, onToggleRead, onToggleStar, onLayoutChange, suppressClick }: Props) {
   const [titleFitsOneLine, setTitleFitsOneLine] = useState(false);
   const titleMeasureRef = useRef<HTMLHeadingElement>(null);
   const lastPointerTypeRef = useRef("mouse");
@@ -111,7 +110,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, feedIconUrl, a
         article={article}
         titleFitsOneLine={titleFitsOneLine}
         titleMeasureRef={titleMeasureRef}
-        source={<ArticleSourceLabel article={article} iconUrl={feedIconUrl}/>}
+        source={<ArticleSourceLabel article={article}/>}
         readAction={<button className="icon-button article-read-button" aria-label={article.isRead ? "取消已读" : "标记已读"} title={article.isRead ? "取消已读" : "标记已读"} onClick={(e) => { e.stopPropagation(); onToggleRead(); }}>{shortcutNumber ? <ArticleShortcutNumber number={shortcutNumber}/> : <ReadStateIcon isRead={article.isRead} size={18}/>}</button>}
         starAction={<button className={`icon-button article-star-button ${article.isStarred ? "starred" : ""} ${starShortcutNumber ? "showing-shortcut" : ""}`} aria-label={article.isStarred ? "取消星标" : "加入星标"} onClick={(e) => { e.stopPropagation(); onToggleStar(); }}>{starShortcutNumber ? <ArticleShortcutNumber number={starShortcutNumber}/> : <Star size={17} fill={article.isStarred ? "currentColor" : "none"}/>}</button>}
       />

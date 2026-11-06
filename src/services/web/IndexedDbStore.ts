@@ -1,9 +1,11 @@
 import { rssError } from "@/services/rss/errors";
 
 const DATABASE_NAME = "swipyrss";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const CREDENTIAL_STORE = "credentials";
 const CACHE_STORE = "cacheEntries";
+const FEED_ICON_STORE = "feedIcons";
+const FEED_ICON_REVISION_KEY = "";
 const ACTIVE_CREDENTIAL_ID = "active";
 const MAX_CACHE_BYTES = 100 * 1024 * 1024;
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -24,6 +26,20 @@ type CacheEntryRecord = {
   sizeBytes: number;
   storedAt: number;
   lastAccessed: number;
+};
+
+export type FeedIconRecord = {
+  accountKey: string;
+  key: string;
+  blob: Blob;
+  hash: string;
+  checkedAt: number;
+};
+
+type FeedIconRevision = {
+  accountKey: string;
+  key: typeof FEED_ICON_REVISION_KEY;
+  revision: number;
 };
 
 export type CachedValue<T> = {
@@ -115,6 +131,59 @@ export class IndexedDbStore {
     await transactionDone(writeTransaction);
   }
 
+  async loadFeedIcons(accountKey: string): Promise<{ icons: FeedIconRecord[]; revision: number }> {
+    const database = await this.database();
+    const transaction = database.transaction(FEED_ICON_STORE, "readonly");
+    const [records] = await Promise.all([
+      request<Array<FeedIconRecord | FeedIconRevision>>(
+        transaction.objectStore(FEED_ICON_STORE).index("accountKey").getAll(accountKey),
+      ),
+      transactionDone(transaction),
+    ]);
+    return {
+      icons: records.filter((record): record is FeedIconRecord => "blob" in record),
+      revision: records.find((record): record is FeedIconRevision => "revision" in record)?.revision ?? 0,
+    };
+  }
+
+  async putFeedIcon(record: FeedIconRecord, revision: number, signal: AbortSignal): Promise<boolean> {
+    const database = await this.database();
+    if (signal.aborted) return false;
+
+    // The revision check and write share a transaction so a clear also fences writes from other tabs.
+    const transaction = database.transaction(FEED_ICON_STORE, "readwrite");
+    const store = transaction.objectStore(FEED_ICON_STORE);
+    let accepted = false;
+    const lookup = store.get([record.accountKey, FEED_ICON_REVISION_KEY]);
+    lookup.onsuccess = () => {
+      const current = lookup.result as FeedIconRevision | undefined;
+      if (signal.aborted || (current?.revision ?? 0) !== revision) return;
+      store.put(record);
+      accepted = true;
+    };
+    await transactionDone(transaction);
+    return accepted;
+  }
+
+  async clearFeedIcons(accountKey: string): Promise<number> {
+    const database = await this.database();
+    const transaction = database.transaction(FEED_ICON_STORE, "readwrite");
+    const store = transaction.objectStore(FEED_ICON_STORE);
+    let revision = 0;
+    const lookup = store.get([accountKey, FEED_ICON_REVISION_KEY]);
+    lookup.onsuccess = () => {
+      const current = lookup.result as FeedIconRevision | undefined;
+      revision = (current?.revision ?? 0) + 1;
+      const keys = store.index("accountKey").getAllKeys(accountKey);
+      keys.onsuccess = () => {
+        for (const key of keys.result) store.delete(key);
+        store.put({ accountKey, key: FEED_ICON_REVISION_KEY, revision } satisfies FeedIconRevision);
+      };
+    };
+    await transactionDone(transaction);
+    return revision;
+  }
+
   private async database(): Promise<IDBDatabase> {
     if (!this.databasePromise) this.databasePromise = openDatabase();
     return this.databasePromise;
@@ -162,8 +231,16 @@ function openDatabase(): Promise<IDBDatabase> {
         store.createIndex("accountKey", "accountKey", { unique: false });
         store.createIndex("lastAccessed", "lastAccessed", { unique: false });
       }
+      if (!database.objectStoreNames.contains(FEED_ICON_STORE)) {
+        const store = database.createObjectStore(FEED_ICON_STORE, { keyPath: ["accountKey", "key"] });
+        store.createIndex("accountKey", "accountKey", { unique: false });
+      }
     };
-    openRequest.onsuccess = () => resolve(openRequest.result);
+    openRequest.onsuccess = () => {
+      const database = openRequest.result;
+      database.onversionchange = () => database.close();
+      resolve(database);
+    };
     openRequest.onerror = () => reject(rssError("CacheFailed", "无法打开浏览器本地存储", true));
     openRequest.onblocked = () => reject(rssError("CacheFailed", "浏览器本地存储正在被其他页面占用", true));
   });
