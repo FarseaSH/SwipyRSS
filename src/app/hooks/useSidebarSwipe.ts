@@ -98,11 +98,12 @@ export function useSidebarSwipe(
         suppressNextClickRef.current = false;
       }, 400);
     };
-    // Settings keeps native controls and modal interactions ahead of page navigation.
+    // Preserve text editing, native gestures and modal interactions. Buttons, links and labels
+    // may start navigation; suppressNextClick prevents activating them after a horizontal swipe.
     const settingsGestureBlocked = (target: EventTarget | null) => page === "settings" && (
       Boolean(main.ownerDocument.querySelector('dialog[open], [aria-modal="true"], .settings-select-menu'))
       || (target instanceof Element && Boolean(target.closest(
-        'input, textarea, select, button, a, label, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="listbox"], [data-native-horizontal-scroll]',
+        'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="listbox"], [data-native-horizontal-scroll]',
       )))
     );
     let settingsPointerId: number | null = null;

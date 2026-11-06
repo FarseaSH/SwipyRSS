@@ -12,8 +12,8 @@ function setup({ page = "settings", desktop = false, sidebarOpen = false } = {})
   const cleanups = [], frames = [];
   class Target {
     listeners = new Map(); style = {}; captured = new Set(); clientWidth = 390;
-    control = false;
-    closest(selector) { return this.control && selector.includes("input") ? this : null; }
+    control = "";
+    closest(selector) { return selector.split(",").map(value => value.trim()).includes(this.control) ? this : null; }
     querySelector() { return null; }
     addEventListener(type, handler) { this.listeners.set(type, handler); }
     removeEventListener(type) { this.listeners.delete(type); }
@@ -40,7 +40,7 @@ function setup({ page = "settings", desktop = false, sidebarOpen = false } = {})
   exports.useSidebarSwipe({ current: main }, { current: drawer }, { current: backdrop }, true, sidebarOpen, 0,
     () => opened++, () => closed++, page === "list", () => restored++, page);
   const send = (type, x, y = 200, extra = {}) => { now += 100; return main.emit(type, { clientX: x, clientY: y, ...extra }); };
-  return { main, drawer, backdrop, win, send, control: () => { const target = new Target(); target.control = true; return target; },
+  return { main, drawer, backdrop, win, send, control: (kind = "input") => { const target = new Target(); target.control = kind; return target; },
     modal: value => { modal = value; }, counts: () => ({ opened, closed, restored }),
     cleanup: () => cleanups.reverse().forEach(fn => fn()) };
 }
@@ -74,6 +74,37 @@ test("settings controls, non-primary touches and open modal surfaces take priori
     app.send("pointerdown", 100, 200, kind === "control" ? { target: app.control() } : { isPrimary: kind !== "secondary" });
     app.send("pointermove", 210); app.send("pointerup", 210);
     assert.equal(app.counts().opened, 0); app.cleanup();
+  }
+});
+
+test("settings buttons, links and labels allow swipes while retaining ordinary clicks", () => {
+  for (const kind of ["button", "a", "label"]) {
+    const app = setup();
+    const target = app.control(kind);
+    app.send("pointerdown", 100, 200, { target });
+    app.send("pointerup", 100, 200, { target });
+    assert.equal(app.counts().opened, 0);
+    assert.notEqual(app.win.emit("click").prevented, true, `${kind}: ordinary click remains available`);
+    app.send("pointerdown", 100, 200, { target });
+    app.send("pointermove", 210, 200, { target });
+    app.send("pointerup", 210, 200, { target });
+    assert.equal(app.counts().opened, 1, `${kind}: swipe opens sidebar`);
+    assert.equal(app.win.emit("click").prevented, true, `${kind}: swipe must not activate control`);
+    app.cleanup();
+  }
+});
+
+test("settings text editing and native gesture controls remain excluded", () => {
+  for (const kind of ["input", "textarea", "select", '[contenteditable]:not([contenteditable="false"])',
+    '[role="slider"]', '[role="listbox"]', "[data-native-horizontal-scroll]"]) {
+    const app = setup();
+    const target = app.control(kind);
+    app.send("pointerdown", 100, 200, { target });
+    app.send("pointermove", 210, 200, { target });
+    app.send("pointerup", 210, 200, { target });
+    assert.equal(app.counts().opened, 0, `${kind}: retains native interaction`);
+    assert.notEqual(app.win.emit("click").prevented, true);
+    app.cleanup();
   }
 });
 
