@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "channel": "test",
+  "version": "0.1.3-test.42241588424-1",
+  "sourceCommit": "1a90827a7fa7c23c4d10c360cf2a7adeb70f8fef",
+  "buildId": "test-1a90827a7fa7-42241588424-1",
+  "sourceDirty": false,
+  "createdAt": "2026-11-06T15:17:19.482Z",
+  "package": {
+    "file": "swipyrss.zip",
+    "size": 209781,
+    "sha256": "dfe13d81f96a1133d951f26933701c59701f8fc499d7204f29bb1491c735a5c2"
+  }
+}
