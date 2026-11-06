@@ -3,8 +3,7 @@ import { useArticleTimeSections } from "@/features/article-list/hooks/useArticle
 import { useListDate } from "@/features/article-list/hooks/useListDate";
 import { ArticleListPage } from "@/features/article-list/components/ArticleListPage";
 import { BackgroundReadQueue } from "@/features/article-list/BackgroundReadQueue";
-import { BackgroundReadFailures } from "@/features/article-list/components/BackgroundReadFailures";
-import { useRetainedNoticeText } from "@/components/useRetainedNoticeText";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { loadBulkReadAutoAdvance, saveBulkReadAutoAdvance, shouldAdvanceAfterRead, type BulkReadAutoAdvance } from "@/features/article-list/bulkReadNavigation";
 import { articleMatchesPreviewScope, getScopeKey, getStreamId, type ListScope } from "@/features/article-list/scope";
 import { ConnectPage } from "@/features/connection/components/ConnectPage";
@@ -387,7 +386,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [listHorizontalBlockKey, setListHorizontalBlockKey] = useState(0);
   const [toast, setToast] = useState("");
-  const toastText = useRetainedNoticeText(toast);
+  const [toastSequence, setToastSequence] = useState(0);
   const [externalUrl, setExternalUrl] = useState<string | null>(null);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const closeShortcutHelp = useCallback(() => setShortcutHelpOpen(false), []);
@@ -444,7 +443,12 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * Show a global notification that dismisses itself.
    * 展示一个会自动消失的全局轻提示。
    */
-  const notify = useCallback((message: string) => setToast(message), []);
+  const notify = useCallback((message: string) => {
+    if (!message) return;
+    setToast(message);
+    // Repeated identical actions still receive a full display interval.
+    setToastSequence(sequence => sequence + 1);
+  }, []);
   /**
    * After an unread-to-read transition succeeds, record the affected feeds for folder navigation
    * ordering.
@@ -624,7 +628,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 1800);
     return () => window.clearTimeout(timer);
-  }, [toast]);
+  }, [toast, toastSequence]);
 
   useEffect(() => {
     const activity = loadFeedReadActivity(feedReadActivityStorageKey);
@@ -1139,6 +1143,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
         setListRefreshKey((key) => key + 1);
       }
       if (autoAdvance) advanceAfterRead(nextTarget, requestSequenceRef.current);
+      else notify("当前列表已全部标记为已读");
       return;
     }
 
@@ -1237,7 +1242,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       const warning = (targetMode === "unread" && !willAdvance && !freshPage) || !countsAreFresh
         ? "已全部标记为已读，但部分列表信息刷新失败" : "";
       if (autoAdvance) advanceAfterRead(nextTarget, listSequence, warning);
-      else if (warning) notify(warning);
+      else notify(warning || "当前列表已全部标记为已读");
     } catch (error) {
       if (listSequence === requestSequenceRef.current) {
         notify(normalizeRssError(error).message);
@@ -1610,7 +1615,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
     const succeeded = await commitArticleState(unreadIds, "read", true);
     if (!succeeded) throw new Error("上方文章标记已读失败");
     if (autoAdvance) advanceAfterRead(nextTarget, sequence);
-  }, [advanceAfterRead, startBackgroundRead, markAllReadScopeName, articles, bulkReadAutoAdvance, commitArticleState, nextListTarget, previewMode, rssClient]);
+    else notify(`该条及上方 ${unreadIds.length} 篇已标记为已读`);
+  }, [advanceAfterRead, startBackgroundRead, markAllReadScopeName, articles, bulkReadAutoAdvance, commitArticleState, nextListTarget, previewMode, rssClient, notify]);
 
   /**
    * Share reader and mark-as-read logic between normal opening and history restoration; do not
@@ -1920,6 +1926,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
                 onLoadMore={loadMore}
                 onRefreshList={refreshCurrentList}
                 onMarkAllRead={markCurrentListRead}
+                onToast={notify}
                 onMarkAboveRead={markArticlesAboveRead}
                 onMarkFeedRead={markFeedRead}
                 onOpenSidebar={openSidebar}
@@ -1959,8 +1966,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
             onToast={notify}
           />
         ) : null}
-        <div className={`absolute top-5 left-1/2 z-[80] max-w-[calc(100%-32px)] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg transition-[opacity,translate] duration-300 ease-out motion-reduce:transition-none ${toast ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-3 opacity-0"}`} role="status" aria-hidden={!toast}>{toastText}</div>
-        <BackgroundReadFailures queue={backgroundReadQueue}/>
+        <NotificationCenter message={toast} view={view} queue={backgroundReadQueue}/>
       </main>
       <KeyboardShortcutHelp view={view} mode={mode} swipeMarkReadMode={swipeMarkReadMode} disabled={Boolean(externalUrl) || loadingList} manualOpen={shortcutHelpOpen} onClose={closeShortcutHelp} onOpenSettings={openSettings}/>
       <GestureDebugPanel view={view} sidebarOpen={sidebarOpen}/>

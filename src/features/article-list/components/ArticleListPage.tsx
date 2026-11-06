@@ -6,7 +6,6 @@ import { getBottomToolbar } from "@/components/toolbarGeometry";
 import { useListToolbarDismiss } from "../hooks/useListToolbarDismiss";
 import { ToolbarAnchor } from "@/components/ToolbarAnchor";
 import { FeedIcon } from "@/components/FeedIcon";
-import { useRetainedNoticeText } from "@/components/useRetainedNoticeText";
 import { ReadStateIcon } from "@/components/ReadStateIcon";
 import { SessionReadCountBadge, SessionStarredCountBadge, UnreadCountBadge } from "@/components/UnreadCountBadge";
 import type { Article, ArticleCardLayout, ArticleMode, Feed, FeedFolder, LoadMoreReason, NextListTarget, SwipeMarkReadMode, ToolbarPosition } from "@/types";
@@ -82,6 +81,7 @@ type Props = {
   onLoadMore: (reason: LoadMoreReason) => Promise<void>;
   onRefreshList: () => Promise<void>;
   onMarkAllRead: () => Promise<void>;
+  onToast: (message: string) => void;
   onMarkAboveRead: (ids: string[], source?: "toolbar" | "context-menu") => Promise<void>;
   onMarkFeedRead: (feedId: string) => Promise<void>;
   onOpenSidebar: () => void;
@@ -178,8 +178,6 @@ export function ArticleListPage(props: Props) {
   const returnRouteRef = useRef(false);
   const returnedPageIdsRef = useRef(new Map<number, string[]>());
   const handledReturnSequenceRef = useRef(0);
-  const [toolbarNotice, setToolbarNotice] = useState("");
-  const toolbarNoticeText = useRetainedNoticeText(toolbarNotice);
   const [refreshingList, setRefreshingList] = useState(false);
   const [markReadConfirmationOpen, setMarkReadConfirmationOpen] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
@@ -538,11 +536,11 @@ export function ArticleListPage(props: Props) {
       setLoadMoreFailed(false);
     } catch {
       setLoadMoreFailed(true);
-      if (reason === "manual") setToolbarNotice("加载失败，请点击重试");
+      if (reason === "manual") props.onToast("加载失败，请点击重试");
     } finally {
       localLoadInFlightRef.current = false;
     }
-  }, [props.hasMore, props.loadingMore, props.onLoadMore]);
+  }, [props.hasMore, props.loadingMore, props.onLoadMore, props.onToast]);
 
   useLayoutEffect(() => {
     const previousLayout = previousLayoutRef.current;
@@ -719,7 +717,6 @@ export function ArticleListPage(props: Props) {
     // rules.
     // 侧边所有导航继承会话状态；底部工具栏仍采用原来的重置规则。
     if (props.toolbarPosition === "bottom" && !preserveExpandedToolbar) setSwitchDimmed(false);
-    setToolbarNotice("");
     setMarkReadConfirmationOpen(false);
     setMarkReadError("");
     setPendingAboveReadIds([]);
@@ -797,11 +794,6 @@ export function ArticleListPage(props: Props) {
     if (previousPageIds.length) props.onMarkRead(previousPageIds);
   }, [currentPage, leadingArticleId, props.mode, props.swipeMarkReadMode, props.onMarkRead, resolvePageArticles]);
   useEffect(() => {
-    if (!toolbarNotice) return;
-    const timer = window.setTimeout(() => setToolbarNotice(""), 1600);
-    return () => window.clearTimeout(timer);
-  }, [toolbarNotice]);
-  useEffect(() => {
     // Preload only after the user has moved down at least one group and at most two groups remain
     // after the current group.
     // 只在用户至少向下翻过一组、且当前组之后最多剩两组时预加载。
@@ -871,14 +863,13 @@ export function ArticleListPage(props: Props) {
     if (markAboveRead) {
       if (!pageIsSettled) return;
       if (!aboveUnreadArticleIds.length) {
-        setToolbarNotice("当前屏及上方没有未读文章");
+        props.onToast("当前屏及上方没有未读文章");
         return;
       }
       setPendingAboveReadIds(aboveUnreadArticleIds);
     } else {
       setPendingAboveReadIds([]);
     }
-    setToolbarNotice("");
     setMarkReadError("");
     markReadConfirmationPageRef.current = currentPage;
     bumpToolbarActivity();
@@ -901,10 +892,8 @@ export function ArticleListPage(props: Props) {
     try {
       if (markAboveRead) {
         await props.onMarkAboveRead(pendingAboveReadIds);
-        setToolbarNotice(`当前屏及上方 ${pendingAboveReadIds.length} 篇已标记为已读`);
       } else {
         await props.onMarkAllRead();
-        setToolbarNotice("当前列表已全部标记为已读");
       }
       setMarkReadConfirmationOpen(false);
       setPendingAboveReadIds([]);
@@ -928,7 +917,7 @@ export function ArticleListPage(props: Props) {
     // unrelated navigation.
     // 到达末尾时没有列表变化，不能把保留标记留给下一次无关导航。
     if (!target) toolbarNavigationOriginRef.current = null;
-    setToolbarNotice(target
+    props.onToast(target
       ? `已切换到${target.kind === "folder" ? "文件夹组 " : " "}${target.name}`
       : `已经是最后一个${props.selectedFeed ? " Feed" : "文件夹组"}`);
   };
@@ -1038,7 +1027,7 @@ export function ArticleListPage(props: Props) {
           toolbarNavigationOriginRef.current = { listKey, scopeKey: listScopeKey, position: props.toolbarPosition, reason: "navigation" };
         }
         props.onModeChange(nextMode);
-        setToolbarNotice(nextMode === "all" ? "已切换到所有文章" : "已切换到未读文章");
+        props.onToast(nextMode === "all" ? "已切换到所有文章" : "已切换到未读文章");
       } else if (key === "m") {
         event.preventDefault();
         wakeListToolbar();
@@ -1054,15 +1043,15 @@ export function ArticleListPage(props: Props) {
         event.preventDefault();
         const target = event.key === "[" ? props.onPreviousList() : props.onNextList();
         if (target) {
-          setToolbarNotice(`已切换到${target.kind === "folder" ? "文件夹组 " : " "}${target.name}`);
+          props.onToast(`已切换到${target.kind === "folder" ? "文件夹组 " : " "}${target.name}`);
         } else {
-          setToolbarNotice(`已经是${event.key === "[" ? "第一" : "最后"}个${props.selectedFeed ? " Feed" : "文件夹组"}`);
+          props.onToast(`已经是${event.key === "[" ? "第一" : "最后"}个${props.selectedFeed ? " Feed" : "文件夹组"}`);
         }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentPageArticles, markReadConfirmationOpen, markingRead, pageIsSettled, shortcutsBlocked, shortcutModeRef, activateShortcutMode, resetShortcutMode, props.onToggleStar, props.canReopenReader, props.onNextList, props.onOpenArticle, props.onPreviousList, props.onReopenReader, props.selectedFeed, props.mode, props.onModeChange, props.toolbarPosition, listKey, listScopeKey, wakeListToolbar, requestMarkRead, refreshList, bumpToolbarActivity, setSwitchDimmed]);
+  }, [currentPageArticles, markReadConfirmationOpen, markingRead, pageIsSettled, shortcutsBlocked, shortcutModeRef, activateShortcutMode, resetShortcutMode, props.onToggleStar, props.canReopenReader, props.onNextList, props.onOpenArticle, props.onPreviousList, props.onReopenReader, props.onToast, props.selectedFeed, props.mode, props.onModeChange, props.toolbarPosition, listKey, listScopeKey, wakeListToolbar, requestMarkRead, refreshList, bumpToolbarActivity, setSwitchDimmed]);
 
   const hasPreviousGroup = settledPage > 0;
   const hasNextGroup = hasNextPage;
@@ -1097,7 +1086,7 @@ export function ArticleListPage(props: Props) {
         }}
         onStar={() => props.onToggleStar(contextArticle.id)}
         onMarkAbove={() => {
-          void props.onMarkAboveRead(contextAboveIds, "context-menu").then(() => setToolbarNotice(`该条及上方 ${contextAboveIds.length} 篇已标记为已读`)).catch(() => setToolbarNotice("标记已读失败，已恢复原状态"));
+          void props.onMarkAboveRead(contextAboveIds, "context-menu").catch(() => props.onToast("标记已读失败，已恢复原状态"));
         }}
         onMarkFeed={() => { setFeedReadError(""); setConfirmFeed({ id: contextArticle.feedId, name: feedsById.get(contextArticle.feedId)?.title ?? contextArticle.feedTitle }); }}
         onSelectFeed={() => props.onSelectFeed(contextArticle.feedId)}
@@ -1269,7 +1258,6 @@ export function ArticleListPage(props: Props) {
               </div>
             </div>
           ) : null}
-          <div className={`floating-switch-notice ${toolbarNotice ? "visible" : ""}`} role="status" aria-hidden={!toolbarNotice}>{toolbarNoticeText}</div>
           <button
             ref={markReadTriggerRef}
             className={`floating-switch-option ${markAboveRead && !pageIsSettled ? "is-settling" : ""}`}
