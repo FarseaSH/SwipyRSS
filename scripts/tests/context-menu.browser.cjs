@@ -68,11 +68,11 @@ testUrl.searchParams.set('preview','1');
  await page.getByRole('dialog').waitFor({state:'detached'});
  assert.equal(await page.locator('header h1').innerText(),'未读文章');
  results.push('Feed confirmation warns about unloaded articles; cancel is inert; confirm preserves current mixed scope');
- await right(cards().first()); const feed=await menu().locator('.article-context-feed').innerText();
+ await right(cards().first()); const feed=await menu().locator('.article-context-feed-name').innerText();
  await menu().getByRole('menuitem',{name:'前往此 Feed',exact:true}).click();
  await page.waitForTimeout(250);assert.equal(await page.locator('header h1').innerText(),feed);
- await right(cards().first());assert.equal(await menu().getByRole('menuitem').count(),2);await page.keyboard.press('Escape');
- results.push('Go to Feed navigates correctly; single-Feed menu contains only two basic actions');
+ await right(cards().first());assert.equal(await menu().getByRole('menuitem').count(),3);await page.keyboard.press('Escape');
+ results.push('Go to Feed navigates correctly; single-Feed menu contains the three article actions');
  // Expand side toolbar then right click: the first interaction only collapses.
  await page.locator('.floating-switch').hover();
  await page.locator('.floating-switch .floating-switch-option').first().click();

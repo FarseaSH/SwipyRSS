@@ -8,6 +8,13 @@ Source specification: [SwipyRSS final right-click and long-press proposal](https
 - Mixed scopes show feed metadata and feed actions. Feed bulk read confirms its exact scope, includes unloaded articles and fixes the server timestamp at confirmation. Unread mode invalidates continuations and reloads the current scope; all mode preserves loaded rows and pagination. Successful writes remain visible after refresh failures. Preview mode updates the complete mock collection.
 - Expanded side toolbars consume the first context interaction. Outside clicks close without passing through. Menus support Escape and arrow-key navigation; Feed confirmation traps focus.
 
+## Menu content
+
+- Open Original is first, uses the existing platform external-link handler, and marks only that article read. Missing or blank original URLs disable the action.
+- Starred articles use the list's gold star and pale circular background. The icon and label retain their positions when toggled.
+- A separator precedes Read Above; another separates the Feed group in mixed lists.
+- Feed metadata uses the shared live unread badge (zero hidden, counts above 9999 shown as `9999+`). The menu stays 176px wide; the logo and badge do not shrink. The name takes remaining space and clips without an ellipsis or fade, with a full-name tooltip and 6px before the badge.
+
 ## Verification
 
 ```sh

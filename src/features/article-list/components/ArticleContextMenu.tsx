@@ -1,6 +1,7 @@
-import { ArrowRight, ArrowUpToLine, CheckCheck, Star } from "lucide-react";
+import { ArrowRight, ArrowUpToLine, CheckCheck, ExternalLink, Star } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { UnreadCountBadge } from "@/components/UnreadCountBadge";
 import { FeedIcon } from "@/components/FeedIcon";
 import type { Article, Feed } from "@/types";
 import { contextMenuPosition, touchContextMenuPosition } from "../contextMenu";
@@ -10,10 +11,12 @@ type Props = {
   anchor: ArticleMenuAnchor;
   article: Article;
   feed?: Feed;
+  feedUnreadCount: number;
   mixed: boolean;
   canMarkAbove: boolean;
   menuRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
+  onOpenOriginal: () => void;
   onStar: () => void;
   onMarkAbove: () => void;
   onMarkFeed: () => void;
@@ -86,11 +89,13 @@ export function ArticleContextMenu(props: Props) {
           buttons[next]?.focus();
         } else if (event.key === "Tab") { event.preventDefault(); props.onClose(); }
       }}>
-      <button role="menuitem" onClick={() => run(props.onStar)}><Star size={17} fill={props.article.isStarred ? "currentColor" : "none"} className={props.article.isStarred ? "starred" : undefined}/><span>{props.article.isStarred ? "取消收藏" : "收藏该文章"}</span></button>
+      <button role="menuitem" disabled={!props.article.articleUrl?.trim()} onClick={() => run(props.onOpenOriginal)}><ExternalLink size={17}/><span>打开原链接</span></button>
+      <button role="menuitem" onClick={() => run(props.onStar)}><span className={`article-context-star${props.article.isStarred ? " starred" : ""}`} aria-hidden="true"><Star size={17} fill={props.article.isStarred ? "currentColor" : "none"}/></span><span>{props.article.isStarred ? "取消收藏" : "收藏该文章"}</span></button>
+      <div className="article-context-separator" role="separator"/>
       <button role="menuitem" disabled={!props.canMarkAbove} title={props.canMarkAbove ? undefined : "该条及上方没有未读文章"} onClick={() => run(props.onMarkAbove)}><ArrowUpToLine size={17}/><span>上方已读</span></button>
       {props.mixed ? <>
         <div className="article-context-separator" role="separator"/>
-        <div className="article-context-feed" title={feedName}><FeedIcon feedId={props.feed?.id}/><span>{feedName}</span></div>
+        <div className="article-context-feed" title={feedName}><FeedIcon feedId={props.feed?.id}/><span className="article-context-feed-name">{feedName}</span><UnreadCountBadge count={props.feedUnreadCount}/></div>
         <button role="menuitem" onClick={() => run(props.onMarkFeed)}><CheckCheck size={17}/><span>此 Feed 全部已读</span></button>
         <button role="menuitem" onClick={() => run(props.onSelectFeed)}><ArrowRight size={17}/><span>前往此 Feed</span></button>
       </> : null}
