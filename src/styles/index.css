@@ -786,5 +786,6 @@ button { font: inherit; }
 
 /* Settings reserves horizontal touch gestures for sidebar navigation; vertical scrolling stays native. */
 @media (max-width: 1023px) {
-  .settings-page { touch-action: pan-y pinch-zoom; }
+  .settings-page,
+  .settings-scroll-area { touch-action: pan-y pinch-zoom; }
 }
