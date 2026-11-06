@@ -799,9 +799,9 @@ button { font: inherit; }
 .feed-read-confirm h2 { margin: 0 0 14px; font-size: 16px; }
 .feed-read-confirm p { margin: 10px 0; color: var(--color-copy); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .feed-read-confirm .feed-read-confirm-name { color: var(--color-ink); font-weight: 600; }
-.feed-read-confirm-actions { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+.feed-read-confirm-actions { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 20px; }
 .feed-read-confirm-actions > button { min-height: 42px; border-radius: 12px; cursor: pointer; }
-.feed-read-confirm-actions > button:first-child { flex: none; padding: 0 18px; border: 1px solid var(--color-line); background: var(--color-control); }
+.feed-read-confirm-cancel { padding: 0 18px; border: 1px solid var(--color-line); background: var(--color-control); }
 .feed-read-confirm-actions > button:disabled { opacity: .6; cursor: wait; }
 
 /* Settings reserves horizontal touch gestures for sidebar navigation; vertical scrolling stays native. */

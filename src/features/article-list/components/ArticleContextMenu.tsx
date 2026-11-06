@@ -109,7 +109,7 @@ export function FeedReadConfirmation({ name, busy, error, onCancel, onConfirm }:
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const previous = document.activeElement;
-    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    ref.current?.querySelector<HTMLButtonElement>(".feed-read-confirm-cancel")?.focus();
     return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true }); };
   }, []);
   return createPortal(<div className="feed-read-confirm-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>
@@ -128,7 +128,10 @@ export function FeedReadConfirmation({ name, busy, error, onCancel, onConfirm }:
       <p className="feed-read-confirm-name" title={name}>{name}</p>
       <p id="feed-read-confirm-description">将包含该 Feed 尚未加载的文章。此操作不可一键撤销。</p>
       {error ? <p role="alert" className="mark-read-confirm-error">{error}</p> : null}
-      <div className="feed-read-confirm-actions"><button disabled={busy} onClick={onCancel}>取消</button><button className="mark-read-confirm-submit" disabled={busy} onClick={onConfirm}><CheckCheck size={16}/>{busy ? "正在标记…" : "确认全部已读"}</button></div>
+      <div className="feed-read-confirm-actions">
+        <button className="mark-read-confirm-submit" disabled={busy} onClick={onConfirm}><CheckCheck size={16}/>{busy ? "正在标记…" : "确认全部已读"}</button>
+        <button className="feed-read-confirm-cancel" disabled={busy} onClick={onCancel}>取消</button>
+      </div>
     </div>
   </div>, document.body);
 }
