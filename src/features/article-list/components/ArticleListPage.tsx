@@ -1,3 +1,4 @@
+import type { ExternalArticleOpenOptions } from "@/platform/Platform";
 import type { TimeSection } from "../timeSections";
 import { ArrowUpToLine, CheckCheck, ChevronsRight, CornerLeftUp, Inbox, Menu, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -84,7 +85,7 @@ type Props = {
   onMarkFeedRead: (feedId: string) => Promise<void>;
   onOpenSidebar: () => void;
   onOpenArticle: (id: string) => void;
-  onOpenExternal: (url: string) => void;
+  onOpenExternal: (url: string, options?: ExternalArticleOpenOptions) => void;
   onMarkRead: (ids: string[]) => void;
   onToggleRead: (id: string) => void;
   onToggleStar: (id: string) => void;
@@ -1186,11 +1187,11 @@ export function ArticleListPage(props: Props) {
                     }
                   }}
                   suppressClick={() => suppressClickRef.current}
-                  onOpen={(openOriginal) => {
-                    if (openOriginal && article.articleUrl) {
+                  onOpen={(mode) => {
+                    if (mode !== "reader" && article.articleUrl) {
                       // Open during the click to retain the browser's popup permission.
                       // 在点击回调中直接打开，保留浏览器的弹窗权限。
-                      props.onOpenExternal(article.articleUrl);
+                      props.onOpenExternal(article.articleUrl, { preferForeground: mode === "original-foreground" });
                       props.onMarkRead([article.id]);
                       return;
                     }

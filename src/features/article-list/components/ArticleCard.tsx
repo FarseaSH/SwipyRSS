@@ -6,6 +6,8 @@ import type { Article, ArticleCardLayout } from "@/types";
 import { ArticleCardVisual, ArticleSourceLabel } from "./ArticleCardVisual";
 import { ArticleShortcutNumber } from "./ArticleShortcutNumber";
 
+export type ArticleOpenMode = "reader" | "original-background" | "original-foreground";
+
 type Props = {
   listNow: number;
   timeSectionLabel?: TimeSection;
@@ -17,7 +19,7 @@ type Props = {
   starShortcutNumber?: number;
   highlightPhase: "idle" | "reading" | "holding" | "releasing";
   onHighlightEnd: () => void;
-  onOpen: (openOriginal: boolean) => void;
+  onOpen: (mode: ArticleOpenMode) => void;
   onToggleRead: () => void;
   onToggleStar: () => void;
   onLayoutChange: (articleId: string, layout: ArticleCardLayout) => void;
@@ -41,7 +43,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, active, contex
     heightClass: getHeightClass(titleFitsOneLine),
     titleFitsOneLine,
   };
-  const open = (openOriginal = false) => { if (!suppressClick()) onOpen(openOriginal); };
+  const open = (mode: ArticleOpenMode = "reader") => { if (!suppressClick()) onOpen(mode); };
 
   useLayoutEffect(() => {
     const measureElement = titleMeasureRef.current;
@@ -101,7 +103,7 @@ export function ArticleCard({ listNow, timeSectionLabel, article, active, contex
       aria-hidden={!active}
       aria-label={`打开文章：${article.title}`}
       inert={!active}
-      onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(event.ctrlKey || event.metaKey); }}
+      onClick={(event) => { if (!(event.target as HTMLElement).closest("button, a")) open(event.shiftKey ? "original-foreground" : event.ctrlKey || event.metaKey ? "original-background" : "reader"); }}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
     >
       <span className="article-divider" data-time-tone={timeSectionLabel?.tone} aria-hidden="true">{timeSectionLabel ? <span className="article-time-section"><span className="article-time-section-text">{timeSectionLabel.label}</span></span> : null}</span>
