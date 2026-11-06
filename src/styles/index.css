@@ -52,6 +52,9 @@ button { font: inherit; }
 :focus:not(:is(input, textarea, select, [contenteditable]:not([contenteditable="false"]))) { outline: none; }
 :is(.article-card, .icon-button, .sidebar-item, .sidebar-folder-link, .sidebar-folder-toggle, .reader-tool, .floating-switch-option):focus-visible { background-color: var(--color-selected); }
 .app-header { background: rgba(252,252,253,.92); }
+.sidebar-brand { padding: 0; border: 0; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; transition: opacity 150ms ease; }
+.sidebar-brand:focus-visible { box-shadow: 0 0 0 3px var(--color-accent-100); }
+.sidebar-brand:active { opacity: .6; }
 .article-loading-overlay { background: rgba(252,252,253,.78); }
 
 .icon-button { display: inline-grid; width: 36px; height: 36px; flex: none; place-items: center; border: 0; border-radius: 999px; background: transparent; color: var(--color-muted); transition: 150ms; cursor: pointer; }

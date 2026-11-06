@@ -20,6 +20,7 @@ type SidebarProps = {
   apiConfigured: boolean;
   settingsActive: boolean;
   onClose: () => void;
+  onRestart: () => void;
   onOpenSettings: () => void;
   onSelectMode: (mode: ArticleMode) => void;
   onSelectStarred: () => void;
@@ -31,7 +32,7 @@ type SidebarProps = {
  * Render the subscription tree with all navigation and counts keyed by stable FreshRSS IDs.
  * 渲染订阅树；所有导航和计数都以 FreshRSS 的稳定 ID 为键。
  */
-export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderId, selectedFeedId, starredSelected, feedUnreadCounts, unreadCount, apiConfigured, settingsActive, onClose, onOpenSettings, onSelectMode, onSelectStarred, onSelectFolder, onSelectFeed }: SidebarProps) {
+export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderId, selectedFeedId, starredSelected, feedUnreadCounts, unreadCount, apiConfigured, settingsActive, onClose, onRestart, onOpenSettings, onSelectMode, onSelectStarred, onSelectFolder, onSelectFeed }: SidebarProps) {
   const [expandedFolderIds, setExpandedFolderIds] = useState(() => new Set(
     selectedFolderId ? [selectedFolderId] : folders[0] ? [folders[0].id] : [],
   ));
@@ -220,7 +221,7 @@ export function Sidebar({ drawerRef, open, mode, feeds, folders, selectedFolderI
   return (
     <aside ref={drawerRef} className={`fixed inset-y-0 left-0 z-50 flex h-dvh min-h-0 w-[284px] flex-col overflow-hidden border-r bg-sidebar p-4 transition-transform duration-300 lg:static lg:z-0 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="mb-5 flex h-10 items-center justify-between px-2">
-        <div className="flex items-center gap-2.5 font-bold tracking-[-.02em]"><span className="grid size-8 place-items-center rounded-xl bg-ink text-white"><Rss size={17}/></span>SwipyRSS</div>
+        <button type="button" className="sidebar-brand flex items-center gap-2.5 font-bold tracking-[-.02em]" aria-label="重新启动 SwipyRSS" title="重新启动 SwipyRSS" onClick={onRestart}><span className="grid size-8 place-items-center rounded-xl bg-ink text-white"><Rss size={17}/></span>SwipyRSS</button>
         <button className="sidebar-close-button icon-button lg:hidden" aria-label="关闭侧边栏" onClick={onClose}><X size={18}/></button>
       </div>
       <nav className="space-y-1" aria-label="主要导航">

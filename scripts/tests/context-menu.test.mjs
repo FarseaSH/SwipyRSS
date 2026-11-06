@@ -137,6 +137,7 @@ function scenario({ mode = "all", preview = false, page, counts, write } = {}) {
     setSelectedId: set("selected"), setListRefreshKey: set("refresh"),
     recordFeedsMarkedRead: () => {}, beginReadingSession: () => state.sessions++,
     reconcileUnreadCounts: () => state.reconciliations++,
+    trackWrite: (write) => write,
     getStreamId: (scope) => scope.id,
     normalizeRssError: (error) => ({ message: error.message }), notify: (text) => state.notifications.push(text),
     rssClient: {
