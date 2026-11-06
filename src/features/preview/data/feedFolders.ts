@@ -47,6 +47,9 @@ export const previewFeeds: Feed[] = Array.from(
 ).map((article) => ({
   id: article.feedId,
   title: article.feedTitle,
+  // Stable sample URLs allow settings backups to be exercised without a FreshRSS account.
+  // 稳定的示例 URL 用于在无 FreshRSS 账号时验证设置备份。
+  feedUrl: `https://preview.swipyrss.invalid/feeds/${encodeURIComponent(article.feedId)}.xml`,
   folderIds: previewFolderSeeds
     .filter((folder) => folder.feedTitles.includes(article.feedTitle))
     .map((folder) => folder.id),

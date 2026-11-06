@@ -12,6 +12,8 @@ import { initialArticles } from "@/features/preview/data/articles";
 import { feedFolders as previewFolders, previewFeeds } from "@/features/preview/data/feedFolders";
 import { ReaderPage } from "@/features/reader/components/ReaderPage";
 import { SettingsPage } from "@/features/settings/components/SettingsPage";
+import { SettingsBackupDialog } from "@/features/settings/components/SettingsBackupDialog";
+import { createSettingsBackup, parseSettingsBackup, persistSettingsImport, planSettingsImport, type SettingsBackup } from "@/features/settings/settingsBackup";
 import { Sidebar } from "@/features/subscriptions/components/Sidebar";
 import type { AppPlatform, ExternalArticleOpenOptions } from "@/platform/Platform";
 import { normalizeRssError } from "@/services/rss/errors";
@@ -389,6 +391,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [toastSequence, setToastSequence] = useState(0);
   const [externalUrl, setExternalUrl] = useState<string | null>(null);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [settingsBackupOpen, setSettingsBackupOpen] = useState(false);
+  const closeSettingsBackup = useCallback(() => setSettingsBackupOpen(false), []);
   const closeShortcutHelp = useCallback(() => setShortcutHelpOpen(false), []);
   const openSettings = useCallback(() => {
     setReopenableReaderId(null);
@@ -1799,6 +1803,50 @@ export default function App({ platform }: { platform: AppPlatform }) {
      */ }
   }, []);
 
+  const exportSettings = useCallback(() => createSettingsBackup({
+    startupPage: startupPageMode,
+    toolbarPosition,
+    swipeMarkRead: swipeMarkReadMode,
+  }, articleModesRef.current, feeds), [feeds, startupPageMode, swipeMarkReadMode, toolbarPosition]);
+
+  const importSettings = useCallback((input: SettingsBackup) => {
+    // Revalidate at the write boundary and persist only explicit allowlisted keys.
+    // 写入边界重新校验，持久化时只使用明确的白名单键。
+    const backup = parseSettingsBackup(JSON.stringify(input));
+    const plan = planSettingsImport(backup, feeds);
+    const nextModes = { ...articleModesRef.current, ...plan.modes };
+    const writes: Array<[string, string]> = [];
+    const { settings } = backup;
+    if (settings.startupPage !== undefined) writes.push([STARTUP_PAGE_STORAGE_KEY, settings.startupPage]);
+    if (settings.toolbarPosition !== undefined) writes.push([TOOLBAR_POSITION_STORAGE_KEY, settings.toolbarPosition]);
+    if (settings.swipeMarkRead !== undefined) writes.push([SWIPE_MARK_READ_STORAGE_KEY, settings.swipeMarkRead]);
+    if (Object.keys(plan.modes).length) {
+      if (!articleModeStorageKey || articleModeStorageKeyRef.current !== articleModeStorageKey) {
+        throw new Error("当前订阅尚未准备好，请稍后重试。");
+      }
+      writes.push([articleModeStorageKey, JSON.stringify(nextModes)]);
+    }
+    try { persistSettingsImport(window.localStorage, writes); }
+    catch { throw new Error("无法保存设置，请检查浏览器的本地存储权限或可用空间后重试。"); }
+    if (settings.startupPage !== undefined) {
+      setStartupPageMode(settings.startupPage);
+      startupPageModeRef.current = settings.startupPage;
+    }
+    if (settings.toolbarPosition !== undefined) setToolbarPosition(settings.toolbarPosition);
+    if (settings.swipeMarkRead !== undefined) setSwipeMarkReadMode(settings.swipeMarkRead);
+    articleModesRef.current = nextModes;
+    const nextMode = plan.modes[getScopeKey(scope)];
+    if (nextMode && nextMode !== mode) {
+      // Refresh the active list in the background while leaving the settings dialog open.
+      // 后台更新当前列表，保持设置弹窗与页面不跳转。
+      beginReadingSession(scope, nextMode);
+      setMode(nextMode);
+      setReopenableReaderId(null);
+      if (previewMode) applyPreviewScope(scope, nextMode);
+      else void loadRemoteScope(scope, nextMode);
+    }
+  }, [applyPreviewScope, articleModeStorageKey, beginReadingSession, feeds, loadRemoteScope, mode, previewMode, scope]);
+
   /**
    * Reuse the full connection flow from settings, then return to the refreshed list on success.
    * 设置页复用完整连接流程，成功后返回刷新过的列表。
@@ -1885,7 +1933,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       <button ref={backdropRef} className={`fixed inset-y-0 left-0 z-40 w-full border-0 bg-[rgba(14,24,38,.28)] transition-opacity duration-300 lg:hidden ${sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} aria-label="关闭侧边栏" onClick={closeSidebar}/>
       <main ref={mainRef} className="relative h-full min-h-0 min-w-0 overflow-hidden" inert={shortcutHelpOpen}>
         {view === "settings" ? (
-          <SettingsPage connectionDefaults={connectionDefaults} startupPageMode={startupPageMode} onStartupPageModeChange={changeStartupPageMode} toolbarPosition={toolbarPosition} onToolbarPositionChange={changeToolbarPosition} connection={connection} configured={Boolean(connection)} swipeMarkReadMode={swipeMarkReadMode} onSwipeMarkReadModeChange={changeSwipeMarkReadMode} bulkReadAutoAdvance={bulkReadAutoAdvance} onBulkReadAutoAdvanceChange={changeBulkReadAutoAdvance} onCancel={() => setView("list")} onOpenSidebar={openSidebar} onOpenShortcutHelp={() => setShortcutHelpOpen(true)} onSave={saveSettings} clearingFeedIcons={clearingFeedIcons !== null && clearingFeedIcons === feedIconCache} onClearFeedIcons={feedIconCache ? clearFeedIcons : undefined}/>
+          <SettingsPage connectionDefaults={connectionDefaults} startupPageMode={startupPageMode} onStartupPageModeChange={changeStartupPageMode} toolbarPosition={toolbarPosition} onToolbarPositionChange={changeToolbarPosition} connection={connection} configured={Boolean(connection)} swipeMarkReadMode={swipeMarkReadMode} onSwipeMarkReadModeChange={changeSwipeMarkReadMode} bulkReadAutoAdvance={bulkReadAutoAdvance} onBulkReadAutoAdvanceChange={changeBulkReadAutoAdvance} onCancel={() => setView("list")} onOpenSidebar={openSidebar} onOpenShortcutHelp={() => setShortcutHelpOpen(true)} onOpenSettingsBackup={() => setSettingsBackupOpen(true)} onSave={saveSettings} clearingFeedIcons={clearingFeedIcons !== null && clearingFeedIcons === feedIconCache} onClearFeedIcons={feedIconCache ? clearFeedIcons : undefined}/>
         ) : (
           <>
             <div className="h-full min-h-0" aria-hidden={view === "reader"} inert={view === "reader"}>
@@ -1971,7 +2019,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
         ) : null}
         <NotificationCenter message={toast} view={view} queue={backgroundReadQueue}/>
       </main>
-      <KeyboardShortcutHelp view={view} mode={mode} swipeMarkReadMode={swipeMarkReadMode} disabled={Boolean(externalUrl) || loadingList} manualOpen={shortcutHelpOpen} onClose={closeShortcutHelp} onOpenSettings={openSettings}/>
+      {settingsBackupOpen && <SettingsBackupDialog feeds={feeds} onExport={exportSettings} onImport={importSettings} onClose={closeSettingsBackup}/>}
+      <KeyboardShortcutHelp view={view} mode={mode} swipeMarkReadMode={swipeMarkReadMode} disabled={settingsBackupOpen || Boolean(externalUrl) || loadingList} manualOpen={shortcutHelpOpen} onClose={closeShortcutHelp} onOpenSettings={openSettings}/>
       <GestureDebugPanel view={view} sidebarOpen={sidebarOpen}/>
     </div>
   );

@@ -19,7 +19,8 @@
     "build:site": "node scripts/build-site.mjs",
     "test:context-menu": "node --test scripts/tests/context-menu.test.mjs",
     "test:context-menu:browser": "node scripts/tests/context-menu.browser.cjs",
-    "test:article-open": "node --test scripts/tests/article-open.test.mjs"
+    "test:article-open": "node --test scripts/tests/article-open.test.mjs",
+    "test:settings-backup": "node --test scripts/tests/settings-backup.test.mjs"
   },
   "dependencies": {
     "dompurify": "^3.2.6",
