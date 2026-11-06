@@ -1,20 +1,20 @@
 import { Rss } from "lucide-react";
-import { useState } from "react";
+import { createContext, useContext, useState, useSyncExternalStore } from "react";
+import type { FeedIconCache } from "@/services/web/FeedIconCache";
+
+export const FeedIconContext = createContext<FeedIconCache | null>(null);
+const subscribeWithoutCache = () => () => {};
 
 type Props = {
-  iconUrl?: string;
+  feedId?: string;
   color?: string;
   size?: number;
   className?: string;
 };
 
-/**
- * Prefer the feed icon returned by FreshRSS; fall back to a generic RSS icon if it is missing or
- * fails to load.
- * 优先显示 FreshRSS 返回的来源图标，缺失或加载失败时回退到通用 RSS 图标。
- */
-export function FeedIcon({ iconUrl, color, size = 14, className = "" }: Props) {
-  const source = iconUrl?.trim();
+export function FeedIcon({ feedId, color, size = 14, className = "" }: Props) {
+  const cache = useContext(FeedIconContext);
+  const source = useSyncExternalStore(cache?.subscribe ?? subscribeWithoutCache, () => cache?.source(feedId));
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const classes = ["feed-icon", className].filter(Boolean).join(" ");
 
@@ -29,7 +29,6 @@ export function FeedIcon({ iconUrl, color, size = 14, className = "" }: Props) {
         alt=""
         aria-hidden="true"
         decoding="async"
-        referrerPolicy="no-referrer"
         onError={() => setFailedSource(source)}
       />
     );

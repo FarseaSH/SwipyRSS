@@ -1,0 +1,10 @@
+import { spawn } from 'node:child_process';
+import { join } from 'node:path';
+import { setup, php, app, origin, root, install, exists } from './tests/freshrss-environment.mjs';
+await setup();
+if (await exists(join(root, 'release/test/swipyrss.zip'))) install(join(root, 'release/test/swipyrss.zip'));
+const server = spawn(php, ['-S', `localhost:${new URL(origin).port || 80}`, '-t', join(app, 'p')], { cwd: app, stdio: 'inherit' });
+console.log(`FreshRSS Extension: ${origin}/i/?c=swipyrss`);
+console.log('Add &preview=1 for sample articles. Local test login: validation / local-validation-only');
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.kill(signal));
+server.on('exit', (code) => process.exit(code || 0));

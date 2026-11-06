@@ -3,6 +3,8 @@ import type { Article, ArticleCardLayout } from "@/types";
 
 const HEADER_AND_GUTTER = 88;
 const TOP_PREVIEW_SPACE = 49;
+// Keep in sync with .article-track padding-top; only the beginning of the track needs space.
+const TRACK_TOP_INSET = 8;
 const COMPACT_ARTICLE_HEIGHT = 82;
 const TITLE_ONLY_ARTICLE_HEIGHT = 92;
 const STANDARD_ARTICLE_HEIGHT = 104;
@@ -64,7 +66,7 @@ function paginateArticles(
   const pages: ArticlePage[] = [];
   const articleHeights = articles.map((article) => getArticleHeight(article.id, layouts));
   const articleStarts: number[] = [];
-  let trackHeight = 0;
+  let trackHeight = TRACK_TOP_INSET;
   for (const articleHeight of articleHeights) {
     articleStarts.push(trackHeight);
     trackHeight += articleHeight;
@@ -76,7 +78,7 @@ function paginateArticles(
     const startOffset = articleStarts[pageStartIndex] ?? 0;
     const snapOffset = Math.max(
       0,
-      startOffset - (pageIndex > 0 ? TOP_PREVIEW_SPACE : 0),
+      pageIndex > 0 ? startOffset - TOP_PREVIEW_SPACE : 0,
     );
     const visibleTrackEnd = snapOffset + viewportHeight;
     let lastVisibleIndex = pageStartIndex;

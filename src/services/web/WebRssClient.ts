@@ -9,7 +9,7 @@ import type {
   StreamPage,
   UnreadCountSnapshot,
 } from "@/types";
-import { FreshRssApi, loginToFreshRss, normalizeWebApiUrl, refreshPublishedLabels } from "./FreshRssApi";
+import { FreshRssApi, loginToFreshRss, normalizeWebApiUrl } from "./FreshRssApi";
 import { IndexedDbStore, type WebCredential } from "./IndexedDbStore";
 
 const BOOTSTRAP_CACHE_KEY = "bootstrap";
@@ -83,7 +83,7 @@ export class WebRssClient implements RssClient {
       if (!normalized.retryable) throw error;
       const cached = await this.cacheOrNull(() => this.store.getCache<StreamPage>(api.accountKey(), cacheKey));
       if (!cached) throw error;
-      return refreshPublishedLabels({ ...cached.value, fromCache: true, stale: cached.stale });
+      return { ...cached.value, fromCache: true, stale: cached.stale };
     }
   }
 

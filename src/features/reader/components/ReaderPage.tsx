@@ -1,4 +1,6 @@
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Share2, Star, UserRound } from "lucide-react";
+import { useArticleTime } from "@/lib/time/ArticleTimeProvider";
+import { formatArticleTime } from "@/lib/time/articleTime";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronUp, Rss, Share2, Star, UserRound } from "lucide-react";
 import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from "react";
 import { useSideToolbarDismiss } from "@/components/useSideToolbarDismiss";
@@ -14,7 +16,6 @@ type Props = {
   obscured?: boolean;
   resetKey: number;
   article: Article;
-  feedIconUrl?: string;
   onBack: () => void;
   onSwipeBack: () => void;
   onKeyboardBack: () => void;
@@ -39,10 +40,15 @@ const SANITIZE_OPTIONS: DOMPurifyConfig = {
  *
  * 展示清洗后的文章正文，并协调阅读手势、状态操作和外链跳转。
  */
-export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, article, feedIconUrl, onBack, onSwipeBack, onKeyboardBack, onPrevious, onNext, onToggleRead, onToggleStar, onOpenExternal, onToast }: Props) {
+export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, article, onBack, onSwipeBack, onKeyboardBack, onPrevious, onNext, onToggleRead, onToggleStar, onOpenExternal, onToast }: Props) {
+  const { now, timeZone } = useArticleTime();
+  const published = formatArticleTime(article.publishedAt, now, timeZone, "reader");
   const panelRef = useRef<HTMLElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const documentRef = useRef<HTMLElement>(null);
+  const copyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const continuityMarkerRef = useRef<HTMLDivElement>(null);
   const positionMarkerRef = useRef<HTMLDivElement>(null);
   const { toolbarDimmed, wakeToolbar, resetToolbar, collapseToolbar } = useReaderInteraction(
@@ -81,6 +87,28 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
     }
     resetToolbar();
   }, [article.id, resetKey, resetToolbar]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const readerDocument = documentRef.current;
+    const copy = copyRef.current;
+    const content = contentRef.current;
+    if (!viewport || !readerDocument || !copy || !content || !open) return;
+
+    // Measure the actual content, excluding the ending and bottom padding. Otherwise the added
+    // space could turn a short article into a long one and keep itself enabled after a resize.
+    // 长短判定不计入收尾区域，避免留白反过来撑长短文；图片加载和视口变化后重新测量。
+    const measure = () => {
+      const contentBottom = content.getBoundingClientRect().bottom
+        - viewport.getBoundingClientRect().top + viewport.scrollTop;
+      readerDocument.dataset.longArticle = String(contentBottom > viewport.clientHeight + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(copy);
+    return () => observer.disconnect();
+  }, [open, article.id, sanitizedContent, toolbarPosition]);
 
   useEffect(() => {
     if (!open || obscured) return;
@@ -205,11 +233,11 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
       </div>
 
       <div ref={viewportRef} className="reader-viewport" tabIndex={-1} aria-label="文章正文，可双击定位或使用方向键翻屏，[ 和 ] 切换文章，回车打开原文，S 切换收藏">
-        <article className="reader-document" lang={article.language}>
+        <article ref={documentRef} className="reader-document" lang={article.language}>
           <div ref={continuityMarkerRef} className="continuity-marker" aria-hidden="true"/>
           <div ref={positionMarkerRef} className="position-marker" aria-hidden="true"/>
-          <div className="reader-copy">
-            <div className="mb-4 flex items-center gap-2 text-sm font-medium text-muted"><FeedIcon iconUrl={feedIconUrl} color={article.feedColor}/><span>{article.feedTitle}</span></div>
+          <div ref={copyRef} className="reader-copy">
+            <div className="mb-4 flex items-center gap-2 text-sm font-medium text-muted"><FeedIcon feedId={article.feedId} color={article.feedColor}/><span>{article.feedTitle}</span></div>
             <h1 className="m-0 text-[27px] font-bold leading-[1.15] tracking-[-.035em] text-ink sm:text-[37px]">
               {originalArticleUrl ? (
                 <button
@@ -224,10 +252,13 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
               ) : article.title}
             </h1>
             <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-              <span className="inline-flex items-center gap-1.5"><CalendarDays size={14} strokeWidth={1.8} aria-hidden="true"/><time dateTime={new Date(article.publishedAt).toISOString()}>{article.publishedLabel}</time></span>
+              <span className="inline-flex items-center gap-1.5"><CalendarDays size={14} strokeWidth={1.8} aria-hidden="true"/><time dateTime={published.dateTime}>{published.label}</time></span>
               {article.author ? <><span aria-hidden="true">·</span><span className="inline-flex items-center gap-1.5"><UserRound size={14} strokeWidth={1.8} aria-hidden="true"/><span>{article.author}</span></span></> : null}
             </div>
-            <div className="reader-html" onClick={openContentLink} dangerouslySetInnerHTML={{ __html: sanitizedContent }}/>
+            <div ref={contentRef} className="reader-html" onClick={openContentLink} dangerouslySetInnerHTML={{ __html: sanitizedContent }}/>
+            <div className="reader-ending" aria-hidden="true">
+              <span className="reader-ending-logo"><Rss/></span>
+            </div>
           </div>
         </article>
       </div>
@@ -320,6 +351,15 @@ function sanitizeArticleHtml(html: string, articleUrl?: string): string {
       anchor.removeAttribute("href");
     }
   });
+
+  // Remove only the final chain's bottom margins, including nested feed wrappers. The ending
+  // supplies the same single gap as a normal paragraph, regardless of the last element's tag.
+  // 只清理正文末尾这条嵌套链的下外边距，确保与结束 Logo 之间只有一个正常段落间距。
+  let tail = template.content.lastElementChild;
+  while (tail) {
+    tail.setAttribute("data-reader-tail", "");
+    tail = tail.lastElementChild;
+  }
 
   return template.innerHTML;
 }

@@ -56,7 +56,7 @@ export function KeyboardShortcutHelp({ view, mode, swipeMarkReadMode, disabled, 
         else if (event.target !== closeRef.current) event.preventDefault();
         return;
       }
-      if (disabled) return;
+      if (disabled || document.querySelector(".article-context-menu, .feed-read-confirm")) return;
       if (event.key !== triggerKey) dismiss();
       if (event.defaultPrevented || event.isComposing || event.repeat) return;
       if (event.key === "," && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
@@ -92,8 +92,12 @@ export function KeyboardShortcutHelp({ view, mode, swipeMarkReadMode, disabled, 
     ["J / K · ↑ / ↓", "下一屏 / 上一屏"], ["PageDown / PageUp", "下一屏 / 上一屏"],
     ["[ / ]", "上一个 / 下一个 Feed 或文件夹组"], ["1–9 / Alt + 1–9", "打开当前屏对应文章"],
     ["按住 Option / Alt", "显示当前屏文章编号"],
+    ["G → 1–9", "显示左侧编号并打开内置正文（5 秒内）"],
+    ["S → 1–9", "显示右侧黄色编号并收藏 / 取消收藏（5 秒内）"],
+    ["Esc", "退出 G / S 编号模式"],
+    [`${modifier} + 点击文章`, "打开原文并标记已读"],
     ["L / →", "重新打开最近阅读的文章（可用时）"], ["/", "切换所有文章 / 未读文章"],
-    ["M", scope === "settings" ? "上方已读 / 全部已读（跟随工具栏，需确认）" : shouldMarkAboveRead(mode, swipeMarkReadMode) ? "确认当前屏及上方已读" : "确认当前范围全部已读（包括尚未加载的文章）"],
+    ["M", shouldMarkAboveRead() ? "确认当前屏及上方已读" : "确认当前范围全部已读（包括尚未加载的文章）"],
     ["R", "刷新当前列表"],
   ] });
   if (scope === "reader" || scope === "settings") sections.push({ title: "文章正文", rows: [

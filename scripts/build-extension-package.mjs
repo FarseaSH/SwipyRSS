@@ -1,0 +1,23 @@
+import { cp, mkdir, readFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
+import { repositoryRoot } from './build-web-package.mjs';
+const name = 'xExtension-SwipyRSS';
+const source = join(repositoryRoot, name);
+const stage = join(repositoryRoot, '.build', 'extension-release');
+const output = join(repositoryRoot, 'release', 'extension');
+const metadata = JSON.parse(await readFile(join(source, 'metadata.json'), 'utf8'));
+await rm(stage, { recursive: true, force: true });
+await mkdir(stage, { recursive: true });
+await mkdir(output, { recursive: true });
+await cp(source, join(stage, name), { recursive: true, filter: (path) => {
+  const relative = path.slice(source.length).replaceAll('\\', '/');
+  return !['/.git', '/.gitignore', '/static/versions', '/storage', '/imports'].some((prefix) => relative === prefix || relative.startsWith(`${prefix}/`));
+} });
+await mkdir(join(stage, name, 'storage'));
+await mkdir(join(stage, name, 'imports'));
+const archive = join(output, `${name}-${metadata.version}.zip`);
+await rm(archive, { force: true });
+const result = spawnSync('zip', ['-q', '-r', '-X', archive, name], { cwd: stage, stdio: 'inherit' });
+if (result.error || result.status !== 0) throw result.error || new Error('Extension packaging failed');
+console.log(`FreshRSS Extension: ${archive}`);
