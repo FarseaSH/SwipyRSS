@@ -1150,7 +1150,7 @@ export function ArticleListPage(props: Props) {
           >
             {orderedFolderFeeds.map((feed) => (
               <button key={feed.id} className="source-navigation-button" onClick={() => props.onSelectFeed(feed.id)}>
-                <FeedIcon iconUrl={feed.iconUrl}/>
+                <FeedIcon feedId={feed.id}/>
                 <span>{feed.title}</span>
                 <UnreadCountBadge count={props.feedUnreadCounts[feed.id] ?? feed.unreadCount ?? 0}/>
               </button>
@@ -1173,7 +1173,6 @@ export function ArticleListPage(props: Props) {
                   timeSectionLabel={props.timeSectionLabels.get(article.id)}
                   key={article.id}
                   article={article}
-                  feedIconUrl={feedsById.get(article.feedId)?.iconUrl}
                   active={activeArticleIds.has(article.id)}
                   shortcutNumber={!shortcutsBlocked && (articleNumbersVisible || shortcutMode === "go") && pageIsSettled ? articleShortcutNumbers.get(article.id) : undefined}
                   starShortcutNumber={!shortcutsBlocked && !articleNumbersVisible && shortcutMode === "star" && pageIsSettled ? articleShortcutNumbers.get(article.id) : undefined}

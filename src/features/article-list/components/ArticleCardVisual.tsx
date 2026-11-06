@@ -16,7 +16,6 @@ type VisualProps = {
 
 type SourceLabelProps = {
   article: Article;
-  iconUrl?: string;
 };
 
 /**
@@ -52,22 +51,14 @@ export function ArticleCardVisual({ listNow, article, titleFitsOneLine, source, 
 }
 
 /**
- * Prefer the FreshRSS feed icon and use the feed's theme color for the fallback RSS icon.
- * 优先使用 FreshRSS 来源图标，并用来源主题色渲染加载失败后的 RSS 图标。
- */
-export function ArticleSourceIcon({ iconUrl, color }: { iconUrl?: string; color: string }) {
-  return <FeedIcon className="article-source-icon" iconUrl={iconUrl} color={color}/>;
-}
-
-/**
  * Render a feed label without its own click behavior for reuse in ordinary text and adjacent
  * previews.
  * 渲染没有独立点击行为的来源标签，供普通文本和相邻预览复用。
  */
-export function ArticleSourceLabel({ article, iconUrl }: SourceLabelProps) {
+export function ArticleSourceLabel({ article }: SourceLabelProps) {
   return (
     <span className="article-source-static">
-      <ArticleSourceIcon iconUrl={iconUrl} color={article.feedColor}/>
+      <FeedIcon className="article-source-icon" feedId={article.feedId} color={article.feedColor}/>
       <span className="article-source-title">{article.feedTitle}</span>
     </span>
   );

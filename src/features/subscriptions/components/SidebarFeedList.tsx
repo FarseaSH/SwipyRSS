@@ -60,7 +60,7 @@ export function SidebarFeedList({ expanded, feeds, folderName, selectedFeedId, f
         <div className="sidebar-feed-list">
           <div id={viewportId} ref={viewportRef} className="sidebar-feed-viewport" role="region" aria-label={`${folderName}的订阅源`}>
             <div ref={contentRef} className="sidebar-feed-content">
-              {feeds.map((feed) => <button key={feed.id} data-feed-id={feed.id} aria-current={selectedFeedId === feed.id ? "page" : undefined} className={`sidebar-feed-item sidebar-item w-full ${selectedFeedId === feed.id ? "active" : ""}`} onClick={() => onSelectFeed(feed.id)}><FeedIcon iconUrl={feed.iconUrl}/><span className="truncate">{feed.title}</span><UnreadCountBadge className="ml-auto" count={feedUnreadCounts[feed.id] ?? feed.unreadCount ?? 0}/></button>)}
+              {feeds.map((feed) => <button key={feed.id} data-feed-id={feed.id} aria-current={selectedFeedId === feed.id ? "page" : undefined} className={`sidebar-feed-item sidebar-item w-full ${selectedFeedId === feed.id ? "active" : ""}`} onClick={() => onSelectFeed(feed.id)}><FeedIcon feedId={feed.id}/><span className="truncate">{feed.title}</span><UnreadCountBadge className="ml-auto" count={feedUnreadCounts[feed.id] ?? feed.unreadCount ?? 0}/></button>)}
             </div>
           </div>
           {overflowing ? <div

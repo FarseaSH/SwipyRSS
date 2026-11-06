@@ -18,6 +18,8 @@ type Props = {
   onToolbarPositionChange: (position: ToolbarPosition) => void;
   swipeMarkReadMode: SwipeMarkReadMode;
   onSwipeMarkReadModeChange: (mode: SwipeMarkReadMode) => void;
+  clearingFeedIcons: boolean;
+  onClearFeedIcons?: () => void;
   onCancel: () => void;
   onOpenSidebar: () => void;
   onOpenShortcutHelp: () => void;
@@ -28,7 +30,7 @@ type Props = {
  * Display application settings and ensure saved API passwords are never returned to React.
  * 展示应用设置，并保证已保存的 API 密码不会重新回传给 React。
  */
-export function SettingsPage({ connectionDefaults, connection, configured, startupPageMode, onStartupPageModeChange, toolbarPosition, onToolbarPositionChange, swipeMarkReadMode, onSwipeMarkReadModeChange, onCancel, onOpenSidebar, onOpenShortcutHelp, onSave }: Props) {
+export function SettingsPage({ connectionDefaults, connection, configured, startupPageMode, onStartupPageModeChange, toolbarPosition, onToolbarPositionChange, swipeMarkReadMode, onSwipeMarkReadModeChange, clearingFeedIcons, onClearFeedIcons, onCancel, onOpenSidebar, onOpenShortcutHelp, onSave }: Props) {
   const initialValue = useMemo<FreshRssConnectionInput>(() => ({
     apiUrl: connection?.apiUrl ?? connectionDefaults.apiUrl,
     username: connection?.username ?? connectionDefaults.username,
@@ -83,6 +85,17 @@ export function SettingsPage({ connectionDefaults, connection, configured, start
                 options={[{ value: "bottom", label: "下方" }, { value: "left", label: "左侧" }, { value: "right", label: "右侧" }]}/>
             </div>
           </section>
+
+          {onClearFeedIcons ? (
+            <section className="settings-card" aria-labelledby="cache-settings-title">
+              <div className="settings-card-header">
+                <div><h3 id="cache-settings-title">缓存管理</h3><p>清除当前账号保存在此设备上的 Feed 图标，并从 FreshRSS 重新获取。</p></div>
+              </div>
+              <button type="button" className="connection-secondary-button disabled:cursor-wait disabled:opacity-60" disabled={clearingFeedIcons} onClick={onClearFeedIcons}>
+                {clearingFeedIcons ? "正在重新获取图标…" : "清除 Feed 图标缓存"}
+              </button>
+            </section>
+          ) : null}
 
           <VersionSettings />
           <section className="settings-card" aria-labelledby="shortcut-settings-title">

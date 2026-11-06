@@ -29,6 +29,8 @@ import type {
 import { useSidebarSwipe } from "./hooks/useSidebarSwipe";
 import { GestureDebugPanel } from "./components/GestureDebugPanel";
 import { useTouchPressFeedback } from "./hooks/useTouchPressFeedback";
+import { FeedIconContext } from "@/components/FeedIcon";
+import { FeedIconCache } from "@/services/web/FeedIconCache";
 import { KeyboardShortcutHelp } from "@/components/KeyboardShortcutHelp";
 
 const READING_LIST_SCOPE: ListScope = { kind: "reading-list" };
@@ -322,6 +324,10 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setReopenableReaderId(null);
   }, []);
   const [feeds, setFeeds] = useState<Feed[]>([]);
+  const feedIconCache = useMemo(() => connection
+    ? new FeedIconCache(JSON.stringify([connection.apiUrl, connection.username]), feeds)
+    : null, [connection, feeds]);
+  const [clearingFeedIcons, setClearingFeedIcons] = useState<FeedIconCache | null>(null);
   const [folders, setFolders] = useState<FeedFolder[]>([]);
   const [readingListUnreadCount, setReadingListUnreadCount] = useState(0);
   const [feedUnreadCounts, setFeedUnreadCounts] = useState<Record<string, number>>({});
@@ -571,6 +577,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
     canReopenReader,
     reopenReader,
   );
+
+  useEffect(() => feedIconCache?.start(), [feedIconCache]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1666,6 +1674,21 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setExternalUrl(null);
   }, [notify]);
 
+  async function clearFeedIcons() {
+    if (!feedIconCache || clearingFeedIcons === feedIconCache) return;
+    if (!window.confirm("清除当前 FreshRSS 账号在此设备保存的 Feed 图标，并立即重新获取？")) return;
+
+    setClearingFeedIcons(feedIconCache);
+    try {
+      const count = await feedIconCache.clearAndRefresh();
+      if (count !== undefined) notify(`已清除缓存，重新获取了 ${count} 个 Feed 图标`);
+    } catch {
+      notify("无法清除 Feed 图标缓存，请重试");
+    } finally {
+      setClearingFeedIcons((current) => current === feedIconCache ? null : current);
+    }
+  }
+
   if (starting) {
     return <main className="grid h-dvh place-items-center bg-canvas text-sm text-muted">正在恢复 SwipyRSS…</main>;
   }
@@ -1674,7 +1697,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     return <ConnectPage connectionDefaults={connectionDefaults} onConnect={connect} onPreview={enterPreview}/>;
   }
 
-  return (
+  const layout = (
     <div className="h-dvh min-h-0 overflow-hidden lg:grid lg:grid-cols-[284px_minmax(0,1fr)]">
       <div className="contents" inert={shortcutHelpOpen}>
         <Sidebar
@@ -1701,7 +1724,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       <button ref={backdropRef} className={`fixed inset-y-0 left-0 z-40 w-full border-0 bg-[rgba(14,24,38,.28)] transition-opacity duration-300 lg:hidden ${sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} aria-label="关闭侧边栏" onClick={closeSidebar}/>
       <main ref={mainRef} className="relative h-full min-h-0 min-w-0 overflow-hidden" inert={shortcutHelpOpen}>
         {view === "settings" ? (
-          <SettingsPage connectionDefaults={connectionDefaults} startupPageMode={startupPageMode} onStartupPageModeChange={changeStartupPageMode} toolbarPosition={toolbarPosition} onToolbarPositionChange={changeToolbarPosition} connection={connection} configured={Boolean(connection)} swipeMarkReadMode={swipeMarkReadMode} onSwipeMarkReadModeChange={changeSwipeMarkReadMode} onCancel={() => setView("list")} onOpenSidebar={openSidebar} onOpenShortcutHelp={() => setShortcutHelpOpen(true)} onSave={saveSettings}/>
+          <SettingsPage connectionDefaults={connectionDefaults} startupPageMode={startupPageMode} onStartupPageModeChange={changeStartupPageMode} toolbarPosition={toolbarPosition} onToolbarPositionChange={changeToolbarPosition} connection={connection} configured={Boolean(connection)} swipeMarkReadMode={swipeMarkReadMode} onSwipeMarkReadModeChange={changeSwipeMarkReadMode} onCancel={() => setView("list")} onOpenSidebar={openSidebar} onOpenShortcutHelp={() => setShortcutHelpOpen(true)} onSave={saveSettings} clearingFeedIcons={clearingFeedIcons !== null && clearingFeedIcons === feedIconCache} onClearFeedIcons={feedIconCache ? clearFeedIcons : undefined}/>
         ) : (
           <>
             <div className="h-full min-h-0" aria-hidden={view === "reader"} inert={view === "reader"}>
@@ -1762,7 +1785,6 @@ export default function App({ platform }: { platform: AppPlatform }) {
                 obscured={Boolean(externalUrl)}
                 resetKey={readerResetKey}
                 article={selectedArticle}
-                feedIconUrl={feedsById.get(selectedArticle.feedId)?.iconUrl}
                 onBack={closeReader}
                 onSwipeBack={closeReaderFromSwipe}
                 onKeyboardBack={closeReader}
@@ -1791,4 +1813,5 @@ export default function App({ platform }: { platform: AppPlatform }) {
       <GestureDebugPanel view={view} sidebarOpen={sidebarOpen}/>
     </div>
   );
+  return <FeedIconContext.Provider value={feedIconCache}>{layout}</FeedIconContext.Provider>;
 }

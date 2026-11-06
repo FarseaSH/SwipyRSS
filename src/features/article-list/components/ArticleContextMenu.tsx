@@ -90,7 +90,7 @@ export function ArticleContextMenu(props: Props) {
       <button role="menuitem" disabled={!props.canMarkAbove} title={props.canMarkAbove ? undefined : "该条及上方没有未读文章"} onClick={() => run(props.onMarkAbove)}><ArrowUpToLine size={17}/><span>上方已读</span></button>
       {props.mixed ? <>
         <div className="article-context-separator" role="separator"/>
-        <div className="article-context-feed" title={feedName}><FeedIcon iconUrl={props.feed?.iconUrl}/><span>{feedName}</span></div>
+        <div className="article-context-feed" title={feedName}><FeedIcon feedId={props.feed?.id}/><span>{feedName}</span></div>
         <button role="menuitem" onClick={() => run(props.onMarkFeed)}><CheckCheck size={17}/><span>此 Feed 全部已读</span></button>
         <button role="menuitem" onClick={() => run(props.onSelectFeed)}><ArrowRight size={17}/><span>前往此 Feed</span></button>
       </> : null}

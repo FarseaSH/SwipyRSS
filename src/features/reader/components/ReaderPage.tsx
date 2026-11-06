@@ -16,7 +16,6 @@ type Props = {
   obscured?: boolean;
   resetKey: number;
   article: Article;
-  feedIconUrl?: string;
   onBack: () => void;
   onSwipeBack: () => void;
   onKeyboardBack: () => void;
@@ -41,7 +40,7 @@ const SANITIZE_OPTIONS: DOMPurifyConfig = {
  *
  * 展示清洗后的文章正文，并协调阅读手势、状态操作和外链跳转。
  */
-export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, article, feedIconUrl, onBack, onSwipeBack, onKeyboardBack, onPrevious, onNext, onToggleRead, onToggleStar, onOpenExternal, onToast }: Props) {
+export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, article, onBack, onSwipeBack, onKeyboardBack, onPrevious, onNext, onToggleRead, onToggleStar, onOpenExternal, onToast }: Props) {
   const { now, timeZone } = useArticleTime();
   const published = formatArticleTime(article.publishedAt, now, timeZone, "reader");
   const panelRef = useRef<HTMLElement>(null);
@@ -213,7 +212,7 @@ export function ReaderPage({ toolbarPosition, open, obscured = false, resetKey, 
           <div ref={continuityMarkerRef} className="continuity-marker" aria-hidden="true"/>
           <div ref={positionMarkerRef} className="position-marker" aria-hidden="true"/>
           <div className="reader-copy">
-            <div className="mb-4 flex items-center gap-2 text-sm font-medium text-muted"><FeedIcon iconUrl={feedIconUrl} color={article.feedColor}/><span>{article.feedTitle}</span></div>
+            <div className="mb-4 flex items-center gap-2 text-sm font-medium text-muted"><FeedIcon feedId={article.feedId} color={article.feedColor}/><span>{article.feedTitle}</span></div>
             <h1 className="m-0 text-[27px] font-bold leading-[1.15] tracking-[-.035em] text-ink sm:text-[37px]">
               {originalArticleUrl ? (
                 <button
