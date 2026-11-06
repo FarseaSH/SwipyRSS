@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useArticleTimeSections } from "@/features/article-list/hooks/useArticleTimeSections";
 import { useListDate } from "@/features/article-list/hooks/useListDate";
 import { ArticleListPage } from "@/features/article-list/components/ArticleListPage";
+import { BackgroundReadQueue } from "@/features/article-list/BackgroundReadQueue";
+import { BackgroundReadFailures } from "@/features/article-list/components/BackgroundReadFailures";
+import { useRetainedNoticeText } from "@/components/useRetainedNoticeText";
+import { loadBulkReadAutoAdvance, saveBulkReadAutoAdvance, shouldAdvanceAfterRead, type BulkReadAutoAdvance } from "@/features/article-list/bulkReadNavigation";
 import { articleMatchesPreviewScope, getScopeKey, getStreamId, type ListScope } from "@/features/article-list/scope";
 import { ConnectPage } from "@/features/connection/components/ConnectPage";
 import { getPreviewArticlePage } from "@/features/preview/data/pagination";
@@ -338,6 +342,12 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [loadingList, setLoadingList] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
+  const articlesRef = useRef(articles);
+  articlesRef.current = articles;
+  const backgroundReadQueue = useMemo(() => new BackgroundReadQueue(), []);
+  const accountKey = connection ? JSON.stringify([connection.apiUrl, connection.username]) : "preview";
+  const accountKeyRef = useRef(accountKey);
+  accountKeyRef.current = accountKey;
   const [articleListRevision, setArticleListRevision] = useState(0);
   const [reopenableReaderId, setReopenableReaderId] = useState<string | null>(null);
   const listNow = useListDate();
@@ -365,8 +375,11 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const startupPageModeRef = useRef(startupPageMode);
   const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>(loadToolbarPosition);
   const [swipeMarkReadMode, setSwipeMarkReadMode] = useState<SwipeMarkReadMode>(loadSwipeMarkReadMode);
+  const [bulkReadAutoAdvance, setBulkReadAutoAdvance] = useState<BulkReadAutoAdvance>(loadBulkReadAutoAdvance);
   const [scope, setScope] = useState<ListScope>(READING_LIST_SCOPE);
   const [view, setView] = useState<AppView>("list");
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [returnHighlight, setReturnHighlight] = useState<{ id: string; sequence: number } | null>(null);
   const [readerResetKey, setReaderResetKey] = useState(0);
@@ -374,6 +387,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [listHorizontalBlockKey, setListHorizontalBlockKey] = useState(0);
   const [toast, setToast] = useState("");
+  const toastText = useRetainedNoticeText(toast);
   const [externalUrl, setExternalUrl] = useState<string | null>(null);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const closeShortcutHelp = useCallback(() => setShortcutHelpOpen(false), []);
@@ -745,6 +759,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * 切换范围时同步关闭阅读页，并选择预览或真实数据通道。
    */
   const selectScope = useCallback((nextScope: ListScope, nextMode?: ArticleMode) => {
+    // Preview navigation also invalidates pending bulk-operation navigation.
+    requestSequenceRef.current += 1;
     const resolvedMode = nextMode
       ?? getRememberedArticleMode(articleModesRef.current, nextScope);
     rememberArticleMode(nextScope, resolvedMode);
@@ -936,6 +952,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       if (
         requestSequence !== unreadRefreshSequenceRef.current
         || mutationVersion !== unreadMutationVersionRef.current
+        || accountKeyRef.current !== accountKey
       ) return;
 
       setReadingListUnreadCount(snapshot.readingListUnreadCount);
@@ -946,7 +963,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       // 自动恢复时保持静默；手动刷新失败才需要额外提示用户。
       if (announceResult) notify(normalizeRssError(error).message);
     }
-  }, [notify, previewMode, rssClient]);
+  }, [accountKey, notify, previewMode, rssClient]);
 
   /**
    * Reconcile unread counts in the background when switching feeds; reuse the snapshot within the
@@ -1027,15 +1044,80 @@ export default function App({ platform }: { platform: AppPlatform }) {
     if (listSequence === requestSequenceRef.current) setLoadingList(false);
   }, [applyPreviewScope, beginReadingSession, mode, notify, previewMode, scope, rssClient, replaceArticleList]);
 
+  /** Background attempts own their rollback values; later user edits always take precedence. */
+  const startBackgroundRead = useCallback((name: string, initialArticles: Article[], send: (operationId: number) => Promise<unknown>) => {
+    const sourceAccount = accountKey;
+    const original = new Map(initialArticles.map(article => [article.id, article]));
+    backgroundReadQueue.enqueue(name, () => trackWrite((async () => {
+      // Retrying an old account's job must never submit it using the newly selected account.
+      if (accountKeyRef.current !== sourceAccount) throw new Error("请返回原账号后重试");
+      const previous = new Map(original);
+      for (const article of articlesRef.current) if (previous.has(article.id)) previous.set(article.id, article);
+      const operationId = ++mutationSequenceRef.current;
+      const feedDeltas = new Map<string, number>();
+      let unreadDelta = 0;
+      for (const article of previous.values()) {
+        latestMutationRef.current.set(`read:${article.id}`, operationId);
+        if (!article.isRead) {
+          unreadDelta -= 1;
+          feedDeltas.set(article.feedId, (feedDeltas.get(article.feedId) ?? 0) - 1);
+        }
+      }
+      unreadMutationVersionRef.current += 1;
+      setArticles(current => current.map(article => previous.has(article.id) ? { ...article, isRead: true } : article));
+      setReadingListUnreadCount(current => Math.max(0, current + unreadDelta));
+      setFeedUnreadCounts(current => applyFeedUnreadDeltas(current, feedDeltas));
+      try {
+        await send(operationId);
+        if (accountKeyRef.current !== sourceAccount) return;
+        unreadMutationVersionRef.current += 1;
+        recordFeedsMarkedRead(new Set(feedDeltas.keys()));
+        void reconcileUnreadCounts(false);
+      } catch (error) {
+        if (accountKeyRef.current === sourceAccount) {
+          const rollback = new Map([...previous].filter(([id]) => latestMutationRef.current.get(`read:${id}`) === operationId));
+          const restoreDeltas = new Map<string, number>();
+          let restoreCount = 0;
+          for (const article of rollback.values()) if (!article.isRead) {
+            restoreCount += 1;
+            restoreDeltas.set(article.feedId, (restoreDeltas.get(article.feedId) ?? 0) + 1);
+          }
+          unreadMutationVersionRef.current += 1;
+          setArticles(current => current.map(article => {
+            const old = rollback.get(article.id);
+            return old ? { ...article, isRead: old.isRead } : article;
+          }));
+          setReadingListUnreadCount(current => current + restoreCount);
+          setFeedUnreadCounts(current => applyFeedUnreadDeltas(current, restoreDeltas));
+          void reconcileUnreadCounts(false);
+        }
+        throw error;
+      }
+    })()));
+  }, [accountKey, backgroundReadQueue, reconcileUnreadCounts, recordFeedsMarkedRead, trackWrite]);
+
+  /** Use the captured next target only if the user is still on the originating list. */
+  const advanceAfterRead = useCallback((target: NextListTarget | null, sequence: number, warning = "") => {
+    if (sequence !== requestSequenceRef.current || viewRef.current !== "list") return;
+    if (target) {
+      selectScope({ kind: target.kind, id: target.id });
+      notify(`${warning ? `${warning}；` : ""}已切换到${target.kind === "folder" ? "下一组 " : "下一 Feed "}${target.name}`);
+    } else {
+      notify(`${warning ? `${warning}；` : ""}已经是最后一个${scope.kind === "feed" ? " Feed" : "分组"}`);
+    }
+  }, [notify, scope.kind, selectScope]);
+
   /**
-   * Mark the entire current FreshRSS stream as read, then rebuild the list using its first page and
-   * unread counts. Fix the time boundary after confirmation so articles arriving during the
-   * operation are not marked accidentally.
-   *
-   * 把当前 FreshRSS stream 整体标记为已读，再用第一页与未读计数重建列表。
-   * 时间边界固定在用户确认之后，操作期间新到达的文章不会被误标。
+   * Mark the current stream up to confirmation time. With auto-advance, navigate immediately and
+   * submit in the background; retry only the original request, never the navigation.
+   * Reload only unread mode when staying on this list; All mode retains its position and pages.
+   * 自动切换时立即跳转，后台提交原范围的请求；重试不重复跳转。留在原列表时仅刷新未读模式。
    */
   const markCurrentListRead = useCallback(async () => {
+    // Freeze the destination before unread counts or ordering change during the request.
+    const autoAdvance = shouldAdvanceAfterRead(bulkReadAutoAdvance, "all");
+    const nextTarget = nextListTarget;
+    const willAdvance = autoAdvance && nextTarget !== null;
     if (previewMode) {
       const newlyReadFeedIds = new Set<string>();
       for (const [articleId, article] of previewArticlesRef.current) {
@@ -1050,19 +1132,28 @@ export default function App({ platform }: { platform: AppPlatform }) {
       recordFeedsMarkedRead(newlyReadFeedIds);
       if (mode === "all") {
         setArticles((current) => current.map((article) => ({ ...article, isRead: true })));
-      } else {
+      } else if (!willAdvance) {
         const visibleArticles = applyPreviewScope(scope, mode);
         setSelectedId(visibleArticles[0]?.id ?? null);
         beginReadingSession(scope, mode, true);
         setListRefreshKey((key) => key + 1);
       }
+      if (autoAdvance) advanceAfterRead(nextTarget, requestSequenceRef.current);
       return;
     }
 
     const targetScope = scope;
     const targetMode = mode;
     const streamId = getStreamId(targetScope);
-    const beforeTimestampUsec = `${Date.now()}000`;
+    const confirmedAt = Date.now();
+    const beforeTimestampUsec = `${confirmedAt}000`;
+    if (willAdvance) {
+      const sequence = requestSequenceRef.current;
+      startBackgroundRead(markAllReadScopeName, articles.filter(article => !article.isRead && article.publishedAt <= confirmedAt),
+        () => rssClient.markStreamRead({ streamId, beforeTimestampUsec }));
+      advanceAfterRead(nextTarget, sequence);
+      return;
+    }
     const listSequence = ++requestSequenceRef.current;
 
     // Old continuations and pending responses must not overwrite the list after a bulk operation
@@ -1118,7 +1209,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       const mutationVersion = unreadMutationVersionRef.current;
       unreadRefreshRequestedAtRef.current = Date.now();
       const [pageResult, unreadResult] = await Promise.allSettled([
-        targetMode === "unread" ? rssClient.getStream({ streamId, unreadOnly: true }) : Promise.resolve(null),
+        targetMode === "unread" && !willAdvance ? rssClient.getStream({ streamId, unreadOnly: true }) : Promise.resolve(null),
         rssClient.refreshUnreadCounts(),
       ]);
       if (listSequence !== requestSequenceRef.current) return;
@@ -1139,13 +1230,14 @@ export default function App({ platform }: { platform: AppPlatform }) {
         setFeedUnreadCounts(unreadResult.value.feedUnreadCounts);
       }
 
-      if (targetMode === "unread") {
+      if (targetMode === "unread" && !willAdvance) {
         beginReadingSession(targetScope, targetMode, true);
         setListRefreshKey((key) => key + 1);
       }
-      if ((targetMode === "unread" && !freshPage) || !countsAreFresh) {
-        notify("已全部标记为已读，但部分列表信息刷新失败");
-      }
+      const warning = (targetMode === "unread" && !willAdvance && !freshPage) || !countsAreFresh
+        ? "已全部标记为已读，但部分列表信息刷新失败" : "";
+      if (autoAdvance) advanceAfterRead(nextTarget, listSequence, warning);
+      else if (warning) notify(warning);
     } catch (error) {
       if (listSequence === requestSequenceRef.current) {
         notify(normalizeRssError(error).message);
@@ -1154,7 +1246,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     } finally {
       if (targetMode === "unread" && listSequence === requestSequenceRef.current) setLoadingList(false);
     }
-  }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient, replaceArticleList, trackWrite]);
+  }, [advanceAfterRead, startBackgroundRead, markAllReadScopeName, bulkReadAutoAdvance, nextListTarget, applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient, replaceArticleList, trackWrite]);
 
   /** Mark exactly one Feed, including its unloaded entries, without changing the selected scope. */
   const markFeedRead = useCallback(async (feedId: string) => {
@@ -1499,15 +1591,26 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * the user can retry.
    * 工具栏批量操作需要等待远端结果，失败时让确认层保持打开以便重试。
    */
-  const markArticlesAboveRead = useCallback(async (ids: string[]) => {
+  const markArticlesAboveRead = useCallback(async (ids: string[], source: "toolbar" | "context-menu" = "toolbar") => {
+    const sequence = requestSequenceRef.current;
+    const nextTarget = nextListTarget;
+    const autoAdvance = shouldAdvanceAfterRead(bulkReadAutoAdvance, source === "context-menu" ? "context-above" : "toolbar-above");
     const unreadArticleIds = new Set(
       articles.filter((article) => !article.isRead).map((article) => article.id),
     );
     const unreadIds = ids.filter((id) => unreadArticleIds.has(id));
     if (!unreadIds.length) return;
+    if (autoAdvance && nextTarget !== null && !previewMode) {
+      const idSet = new Set(unreadIds);
+      startBackgroundRead(`${markAllReadScopeName}（上方已读）`, articles.filter(article => idSet.has(article.id)),
+        operationId => rssClient.editEntryStates({ articleIds: unreadIds, read: true, operationId }));
+      advanceAfterRead(nextTarget, sequence);
+      return;
+    }
     const succeeded = await commitArticleState(unreadIds, "read", true);
     if (!succeeded) throw new Error("上方文章标记已读失败");
-  }, [articles, commitArticleState]);
+    if (autoAdvance) advanceAfterRead(nextTarget, sequence);
+  }, [advanceAfterRead, startBackgroundRead, markAllReadScopeName, articles, bulkReadAutoAdvance, commitArticleState, nextListTarget, previewMode, rssClient]);
 
   /**
    * Share reader and mark-as-read logic between normal opening and history restoration; do not
@@ -1658,6 +1761,11 @@ export default function App({ platform }: { platform: AppPlatform }) {
     }
   }, []);
 
+  const changeBulkReadAutoAdvance = useCallback((value: BulkReadAutoAdvance) => {
+    setBulkReadAutoAdvance(value);
+    saveBulkReadAutoAdvance(value);
+  }, []);
+
   /**
    * Save the preference for the next initialization without reloading the current list or startup
    * effect.
@@ -1768,7 +1876,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       <button ref={backdropRef} className={`fixed inset-y-0 left-0 z-40 w-full border-0 bg-[rgba(14,24,38,.28)] transition-opacity duration-300 lg:hidden ${sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} aria-label="关闭侧边栏" onClick={closeSidebar}/>
       <main ref={mainRef} className="relative h-full min-h-0 min-w-0 overflow-hidden" inert={shortcutHelpOpen}>
         {view === "settings" ? (
-          <SettingsPage connectionDefaults={connectionDefaults} startupPageMode={startupPageMode} onStartupPageModeChange={changeStartupPageMode} toolbarPosition={toolbarPosition} onToolbarPositionChange={changeToolbarPosition} connection={connection} configured={Boolean(connection)} swipeMarkReadMode={swipeMarkReadMode} onSwipeMarkReadModeChange={changeSwipeMarkReadMode} onCancel={() => setView("list")} onOpenSidebar={openSidebar} onOpenShortcutHelp={() => setShortcutHelpOpen(true)} onSave={saveSettings} clearingFeedIcons={clearingFeedIcons !== null && clearingFeedIcons === feedIconCache} onClearFeedIcons={feedIconCache ? clearFeedIcons : undefined}/>
+          <SettingsPage connectionDefaults={connectionDefaults} startupPageMode={startupPageMode} onStartupPageModeChange={changeStartupPageMode} toolbarPosition={toolbarPosition} onToolbarPositionChange={changeToolbarPosition} connection={connection} configured={Boolean(connection)} swipeMarkReadMode={swipeMarkReadMode} onSwipeMarkReadModeChange={changeSwipeMarkReadMode} bulkReadAutoAdvance={bulkReadAutoAdvance} onBulkReadAutoAdvanceChange={changeBulkReadAutoAdvance} onCancel={() => setView("list")} onOpenSidebar={openSidebar} onOpenShortcutHelp={() => setShortcutHelpOpen(true)} onSave={saveSettings} clearingFeedIcons={clearingFeedIcons !== null && clearingFeedIcons === feedIconCache} onClearFeedIcons={feedIconCache ? clearFeedIcons : undefined}/>
         ) : (
           <>
             <div className="h-full min-h-0" aria-hidden={view === "reader"} inert={view === "reader"}>
@@ -1851,7 +1959,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
             onToast={notify}
           />
         ) : null}
-        <div className={`absolute top-5 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg transition-all duration-300 ${toast ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-3 opacity-0"}`} role="status">{toast}</div>
+        <div className={`absolute top-5 left-1/2 z-[80] max-w-[calc(100%-32px)] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg transition-[opacity,translate] duration-300 ease-out motion-reduce:transition-none ${toast ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-3 opacity-0"}`} role="status" aria-hidden={!toast}>{toastText}</div>
+        <BackgroundReadFailures queue={backgroundReadQueue}/>
       </main>
       <KeyboardShortcutHelp view={view} mode={mode} swipeMarkReadMode={swipeMarkReadMode} disabled={Boolean(externalUrl) || loadingList} manualOpen={shortcutHelpOpen} onClose={closeShortcutHelp} onOpenSettings={openSettings}/>
       <GestureDebugPanel view={view} sidebarOpen={sidebarOpen}/>

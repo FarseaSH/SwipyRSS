@@ -28,13 +28,15 @@ export function TimeZoneSelect() {
   const filtered = options.filter(option => option.label.toLowerCase().includes(query.trim().toLowerCase().replaceAll(" ", "_")) || option.label.toLowerCase().includes(query.trim().toLowerCase()));
   const choose = (value: string) => { setPreference(value); dialog.current?.close(); };
   return <div className="timezone-field settings-field">
-    <label id="display-timezone-label" htmlFor="display-timezone">显示时区</label>
+    <div className="settings-field-copy">
+      <label id="display-timezone-label" htmlFor="display-timezone">显示时区</label>
+      <p>仅调整文章发布时间的显示，不影响文章排序和原始数据。设置保存在当前设备。</p>
+      {preference === "auto" && deviceTimeZoneFallback && <p role="status">无法识别设备时区，已临时使用 UTC。可以手动选择时区。</p>}
+    </div>
     <button id="display-timezone" type="button" className="settings-select-trigger timezone-trigger" aria-haspopup="dialog"
       aria-labelledby="display-timezone-label display-timezone-value" onClick={() => { setQuery(""); dialog.current?.showModal(); }}>
       <span id="display-timezone-value">{preference === "auto" ? `自动跟随设备（${timeZone}）` : zoneLabel(timeZone, now)}</span><ChevronDown size={17}/>
     </button>
-    {preference === "auto" && deviceTimeZoneFallback && <p role="status">无法识别设备时区，已临时使用 UTC。可以手动选择时区。</p>}
-    <p>仅调整文章发布时间的显示，不影响文章排序和原始数据。设置保存在当前设备。</p>
     <dialog ref={dialog} className="timezone-dialog" aria-labelledby="timezone-dialog-title" onClick={event => { if (event.target === dialog.current) dialog.current?.close(); }}>
       <div className="timezone-dialog-header"><h3 id="timezone-dialog-title">选择显示时区</h3><button type="button" className="icon-button" aria-label="关闭时区选择" onClick={() => dialog.current?.close()}><X size={18}/></button></div>
       <div className="timezone-search"><Search size={18}/><input autoFocus aria-label="搜索时区" placeholder="搜索城市、地区或 IANA 时区" value={query} onChange={event => setQuery(event.target.value)}

@@ -138,6 +138,8 @@ function scenario({ mode = "all", preview = false, page, counts, write } = {}) {
     recordFeedsMarkedRead: () => {}, beginReadingSession: () => state.sessions++,
     reconcileUnreadCounts: () => state.reconciliations++,
     trackWrite: (write) => write,
+    bulkReadAutoAdvance: "both",
+    advanceAfterRead: () => assert.fail("Feed-specific Mark All must never advance, even with both actions enabled"),
     getStreamId: (scope) => scope.id,
     normalizeRssError: (error) => ({ message: error.message }), notify: (text) => state.notifications.push(text),
     rssClient: {

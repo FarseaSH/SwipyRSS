@@ -111,8 +111,13 @@ button { font: inherit; }
 .settings-title-block p,.settings-card-header p { margin: 0; color: var(--color-muted); font-size: 13px; line-height: 1.55; }
 .settings-card { border: 1px solid var(--color-line); border-radius: 24px; padding: 28px; background: rgba(255,255,255,.96); box-shadow: 0 8px 30px rgba(31,49,72,.055); }
 .settings-card + .settings-card { margin-top: 20px; }
-.settings-field { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.settings-field { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,220px); align-items: center; gap: 16px; }
 .settings-field label { font-size: 14px; font-weight: 600; }
+.settings-field-copy { min-width: 0; }
+.settings-field-copy label { display: block; }
+.settings-field-copy p { margin: 5px 0 0; color: var(--color-muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.settings-field > .settings-select-trigger, .settings-field > select { width: 100%; min-width: 0; }
+.settings-field > .settings-select-trigger span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-select-trigger { display: flex; min-width: 190px; min-height: 44px; align-items: center; justify-content: space-between; gap: 24px; border: 1px solid var(--color-line); border-radius: 14px; padding: 10px 14px; background: var(--color-control); color: var(--color-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease; }
 .settings-select-trigger:hover, .settings-select-trigger[aria-expanded="true"] { background: var(--color-selected); }
 .settings-select-trigger:focus-visible { outline: none; background: var(--color-selected); }
@@ -579,7 +584,8 @@ button { font: inherit; }
   .settings-scroll-area { padding: 26px 14px 48px; }
   .settings-card { border-radius: 20px; padding: 22px 18px; }
   .settings-card-header { display: grid; }
-  .settings-field { align-items: stretch; flex-direction: column; gap: 10px; }
+  .settings-field { grid-template-columns: minmax(0,1fr) minmax(0,48%); gap: 12px; }
+  .settings-field > .settings-select-trigger { gap: 8px; padding-inline: 10px; font-size: 13px; }
   .connection-actions { display: grid; grid-template-columns: minmax(0,.72fr) minmax(0,1.28fr); }
   .connection-actions > .connection-primary-button:only-child { grid-column: 1 / -1; }
 }
@@ -739,8 +745,6 @@ button { font: inherit; }
   transform: none;
 }
 
-.timezone-field { flex-wrap: wrap; }
-.timezone-field > p { flex-basis: 100%; margin: 0; color: var(--color-muted); font-size: 12px; }
 .timezone-trigger { max-width: 100%; }
 .timezone-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
 .timezone-dialog { margin: auto; width: min(560px, calc(100vw - 24px)); max-height: min(640px, calc(100dvh - 32px)); padding: 18px; border: 1px solid var(--color-line); border-radius: 20px; background: var(--color-panel); color: var(--color-ink); box-shadow: 0 16px 60px #17253633; }

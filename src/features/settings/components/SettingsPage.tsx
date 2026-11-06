@@ -1,4 +1,5 @@
 import { TimeZoneSelect } from "./TimeZoneSelect";
+import type { BulkReadAutoAdvance } from "@/features/article-list/bulkReadNavigation";
 import { CheckCircle2, Eye, Keyboard, Menu, Settings } from "lucide-react";
 import { FreshRssConnectionForm } from "@/features/connection/components/FreshRssConnectionForm";
 import { useMemo } from "react";
@@ -18,6 +19,8 @@ type Props = {
   onToolbarPositionChange: (position: ToolbarPosition) => void;
   swipeMarkReadMode: SwipeMarkReadMode;
   onSwipeMarkReadModeChange: (mode: SwipeMarkReadMode) => void;
+  bulkReadAutoAdvance: BulkReadAutoAdvance;
+  onBulkReadAutoAdvanceChange: (value: BulkReadAutoAdvance) => void;
   clearingFeedIcons: boolean;
   onClearFeedIcons?: () => void;
   onCancel: () => void;
@@ -30,7 +33,7 @@ type Props = {
  * Display application settings and ensure saved API passwords are never returned to React.
  * 展示应用设置，并保证已保存的 API 密码不会重新回传给 React。
  */
-export function SettingsPage({ connectionDefaults, connection, configured, startupPageMode, onStartupPageModeChange, toolbarPosition, onToolbarPositionChange, swipeMarkReadMode, onSwipeMarkReadModeChange, clearingFeedIcons, onClearFeedIcons, onCancel, onOpenSidebar, onOpenShortcutHelp, onSave }: Props) {
+export function SettingsPage({ connectionDefaults, connection, configured, startupPageMode, onStartupPageModeChange, toolbarPosition, onToolbarPositionChange, swipeMarkReadMode, onSwipeMarkReadModeChange, bulkReadAutoAdvance, onBulkReadAutoAdvanceChange, clearingFeedIcons, onClearFeedIcons, onCancel, onOpenSidebar, onOpenShortcutHelp, onSave }: Props) {
   const initialValue = useMemo<FreshRssConnectionInput>(() => ({
     apiUrl: connection?.apiUrl ?? connectionDefaults.apiUrl,
     username: connection?.username ?? connectionDefaults.username,
@@ -67,12 +70,23 @@ export function SettingsPage({ connectionDefaults, connection, configured, start
               <div><h3 id="swipe-mark-read-title">阅读设置</h3><p>调整启动页面、上滑标记已读的方式与工具栏位置。</p></div>
             </div>
             <div className="settings-field">
-              <label id="startup-page-label" htmlFor="startup-page-mode">启动页面</label>
+              <div className="settings-field-copy">
+                <label id="startup-page-label" htmlFor="startup-page-mode">启动页面</label>
+                <p>重新启动应用时进入指定的文章列表。</p>
+              </div>
               <SettingsSelect id="startup-page-mode" labelId="startup-page-label" value={startupPageMode} onChange={onStartupPageModeChange}
                 options={[{ value: "unread", label: "未读文章" }, { value: "all", label: "所有文章" },
                   { value: "first-folder", label: "第一个 Feed 组列表" }, { value: "first-feed", label: "第一个 Feed 列表" },
                   { value: "last-list", label: "上一次退出的列表" }]}/>
-              <p>重新启动应用时进入指定的文章列表。</p>
+            </div>
+            <div className="settings-field">
+              <div className="settings-field-copy">
+                <label id="bulk-read-auto-advance-label" htmlFor="bulk-read-auto-advance">批量标记已读后自动切换</label>
+                <p>确认后立即切换到下一 Feed 或下一组，后台标记已读；失败时可重试，到末尾不循环。右键“此 Feed 全部已读”不跳转。</p>
+              </div>
+              <SettingsSelect id="bulk-read-auto-advance" labelId="bulk-read-auto-advance-label" value={bulkReadAutoAdvance} onChange={onBulkReadAutoAdvanceChange}
+                options={[{ value: "off", label: "不自动切换" }, { value: "all", label: "仅全部已读后" },
+                  { value: "above", label: "仅右键上方已读后" }, { value: "both", label: "两种操作后都切换" }]}/>
             </div>
             <TimeZoneSelect/>
             <div className="settings-field">

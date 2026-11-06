@@ -6,6 +6,7 @@ import { getBottomToolbar } from "@/components/toolbarGeometry";
 import { useListToolbarDismiss } from "../hooks/useListToolbarDismiss";
 import { ToolbarAnchor } from "@/components/ToolbarAnchor";
 import { FeedIcon } from "@/components/FeedIcon";
+import { useRetainedNoticeText } from "@/components/useRetainedNoticeText";
 import { ReadStateIcon } from "@/components/ReadStateIcon";
 import { SessionReadCountBadge, SessionStarredCountBadge, UnreadCountBadge } from "@/components/UnreadCountBadge";
 import type { Article, ArticleCardLayout, ArticleMode, Feed, FeedFolder, LoadMoreReason, NextListTarget, SwipeMarkReadMode, ToolbarPosition } from "@/types";
@@ -81,7 +82,7 @@ type Props = {
   onLoadMore: (reason: LoadMoreReason) => Promise<void>;
   onRefreshList: () => Promise<void>;
   onMarkAllRead: () => Promise<void>;
-  onMarkAboveRead: (ids: string[]) => Promise<void>;
+  onMarkAboveRead: (ids: string[], source?: "toolbar" | "context-menu") => Promise<void>;
   onMarkFeedRead: (feedId: string) => Promise<void>;
   onOpenSidebar: () => void;
   onOpenArticle: (id: string) => void;
@@ -178,6 +179,7 @@ export function ArticleListPage(props: Props) {
   const returnedPageIdsRef = useRef(new Map<number, string[]>());
   const handledReturnSequenceRef = useRef(0);
   const [toolbarNotice, setToolbarNotice] = useState("");
+  const toolbarNoticeText = useRetainedNoticeText(toolbarNotice);
   const [refreshingList, setRefreshingList] = useState(false);
   const [markReadConfirmationOpen, setMarkReadConfirmationOpen] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
@@ -1095,7 +1097,7 @@ export function ArticleListPage(props: Props) {
         }}
         onStar={() => props.onToggleStar(contextArticle.id)}
         onMarkAbove={() => {
-          void props.onMarkAboveRead(contextAboveIds).then(() => setToolbarNotice(`该条及上方 ${contextAboveIds.length} 篇已标记为已读`)).catch(() => setToolbarNotice("标记已读失败，已恢复原状态"));
+          void props.onMarkAboveRead(contextAboveIds, "context-menu").then(() => setToolbarNotice(`该条及上方 ${contextAboveIds.length} 篇已标记为已读`)).catch(() => setToolbarNotice("标记已读失败，已恢复原状态"));
         }}
         onMarkFeed={() => { setFeedReadError(""); setConfirmFeed({ id: contextArticle.feedId, name: feedsById.get(contextArticle.feedId)?.title ?? contextArticle.feedTitle }); }}
         onSelectFeed={() => props.onSelectFeed(contextArticle.feedId)}
@@ -1267,7 +1269,7 @@ export function ArticleListPage(props: Props) {
               </div>
             </div>
           ) : null}
-          <div className={`floating-switch-notice ${toolbarNotice ? "visible" : ""}`} role="status">{toolbarNotice}</div>
+          <div className={`floating-switch-notice ${toolbarNotice ? "visible" : ""}`} role="status" aria-hidden={!toolbarNotice}>{toolbarNoticeText}</div>
           <button
             ref={markReadTriggerRef}
             className={`floating-switch-option ${markAboveRead && !pageIsSettled ? "is-settling" : ""}`}
