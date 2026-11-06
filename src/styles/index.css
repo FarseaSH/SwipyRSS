@@ -54,7 +54,6 @@ button { font: inherit; }
 .app-header { background: rgba(252,252,253,.92); }
 .sidebar-brand { padding: 0; border: 0; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; transition: opacity 150ms ease; }
 .sidebar-brand:focus-visible { box-shadow: 0 0 0 3px var(--color-accent-100); }
-@media (hover: hover) { .sidebar-brand:hover { opacity: .78; } }
 .sidebar-brand:active { opacity: .6; }
 .article-loading-overlay { background: rgba(252,252,253,.78); }
 
