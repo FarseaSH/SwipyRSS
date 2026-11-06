@@ -1289,8 +1289,12 @@ export default function App({ platform }: { platform: AppPlatform }) {
       setLoadingMore(false);
     };
     invalidateMore();
-    setContinuation(undefined);
-    setLoadingList(true);
+    // All mode keeps its pages in place and uses only the confirmation button's busy state.
+    // 所有文章模式保留分页，只在确认按钮显示处理状态；未读模式才显示列表加载遮罩。
+    if (targetMode === "unread") {
+      setContinuation(undefined);
+      setLoadingList(true);
+    }
     unreadMutationVersionRef.current += 1;
     try {
       await trackWrite(rssClient.markStreamRead({ streamId: feedId, beforeTimestampUsec }));
@@ -1310,8 +1314,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
         : current.map((article) => belongsToOperation(article) ? { ...article, isRead: true } : article));
       setFeedUnreadCounts((current) => ({ ...current, [feedId]: 0 }));
       setReadingListUnreadCount((current) => Math.max(0, current - (feedUnreadCounts[feedId] ?? 0)));
-      if (targetMode === "all") setContinuation(oldContinuation);
-      else {
+      if (targetMode === "unread") {
         beginReadingSession(targetScope, targetMode, true);
         setListRefreshKey((key) => key + 1);
       }
@@ -1341,12 +1344,12 @@ export default function App({ platform }: { platform: AppPlatform }) {
       notify(pageFresh && countsFresh ? "该 Feed 已全部标记为已读" : "该 Feed 已标记为已读，但列表或未读数量刷新失败，请稍后刷新");
     } catch (error) {
       if (listSequence === requestSequenceRef.current) {
-        setContinuation(oldContinuation);
+        if (targetMode === "unread") setContinuation(oldContinuation);
         notify(normalizeRssError(error).message);
       }
       throw error;
     } finally {
-      if (listSequence === requestSequenceRef.current) setLoadingList(false);
+      if (targetMode === "unread" && listSequence === requestSequenceRef.current) setLoadingList(false);
     }
   }, [scope, mode, previewMode, continuation, articles, feedUnreadCounts, applyPreviewScope, beginReadingSession, recordFeedsMarkedRead, reconcileUnreadCounts, rssClient, notify, trackWrite]);
 

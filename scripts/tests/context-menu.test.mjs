@@ -122,7 +122,7 @@ function find(node) {
 find(app);
 assert.ok(callback);
 function scenario({ mode = "all", preview = false, page, counts, write } = {}) {
-  const state = { articles: structuredClone(articles), continuation: "next-page", global: 8, counts: { "feed/a": 6, "feed/b": 2 }, refresh: 0, notifications: [], requests: [], selected: "two", loading: false, sessions: 0, reconciliations: 0 };
+  const state = { articles: structuredClone(articles), continuation: "next-page", global: 8, counts: { "feed/a": 6, "feed/b": 2 }, refresh: 0, notifications: [], requests: [], selected: "two", loading: false, loadingChanges: [], continuationChanges: [], sessions: 0, reconciliations: 0 };
   const set = (key) => (value) => { state[key] = typeof value === "function" ? value(state[key]) : value; };
   const ref = (current = 0) => ({ current });
   const globals = {
@@ -132,7 +132,9 @@ function scenario({ mode = "all", preview = false, page, counts, write } = {}) {
     requestSequenceRef: ref(), loadMoreRequestRef: ref(), loadMoreInFlightRef: ref(true),
     unreadMutationVersionRef: ref(), mutationSequenceRef: ref(), latestMutationRef: ref(new Map()),
     unreadRefreshSequenceRef: ref(), unreadRefreshRequestedAtRef: ref(),
-    setArticles: set("articles"), setContinuation: set("continuation"), setLoadingList: set("loading"),
+    setArticles: set("articles"),
+    setContinuation: value => { state.continuationChanges.push(value); state.continuation = value; },
+    setLoadingList: value => { state.loadingChanges.push(value); state.loading = value; },
     setLoadingMore: set("loadingMore"), setReadingListUnreadCount: set("global"), setFeedUnreadCounts: set("counts"),
     setSelectedId: set("selected"), setListRefreshKey: set("refresh"),
     recordFeedsMarkedRead: () => {}, beginReadingSession: () => state.sessions++,
@@ -169,6 +171,9 @@ test("Feed bulk read sends exactly the target Feed and confirmation timestamp, p
   assert.equal(state.refresh, 0);
   assert.equal(state.selected, "two");
   assert.equal(state.global, 2);
+  assert.deepEqual(state.loadingChanges, []);
+  assert.deepEqual(state.continuationChanges, []);
+  assert.equal(state.sessions, 0);
   assert.ok(globals.loadMoreRequestRef.current >= 2);
   assert.ok(globals.latestMutationRef.current.has("read:one"));
 });
@@ -180,6 +185,7 @@ test("Unread bulk read reloads the current mixed scope and discards old continua
   assert.deepEqual(state.articles.map((a) => a.id), ["two"]);
   assert.equal(state.continuation, "fresh");
   assert.ok(state.refresh > 0);
+  assert.deepEqual(state.loadingChanges, [true, false]);
 });
 
 test("Successful write survives failed or cached refresh without resurrecting target Feed entries", async () => {
@@ -200,6 +206,39 @@ test("Failed write leaves articles and counts intact and permits retry", async (
   assert.equal(state.counts["feed/a"], 6);
   assert.equal(state.continuation, "next-page");
   assert.equal(state.loading, false);
+  assert.deepEqual(state.loadingChanges, []);
+  assert.deepEqual(state.continuationChanges, []);
+});
+
+test("All-mode Feed marking retains pages and avoids the loading overlay throughout slow writes and counts refresh", async () => {
+  let finishWrite, finishCounts;
+  const writeGate = new Promise(resolve => { finishWrite = resolve; });
+  const countsGate = new Promise(resolve => { finishCounts = resolve; });
+  let countsStarted;
+  const countsReady = new Promise(resolve => { countsStarted = resolve; });
+  const { action, state } = scenario({
+    write: () => writeGate,
+    counts: () => { countsStarted(); return countsGate; },
+  });
+  const pending = action("feed/a");
+  assert.deepEqual(state.articles, articles, "do not change article states before the server accepts the write");
+  assert.deepEqual(state.loadingChanges, []);
+  assert.deepEqual(state.continuationChanges, []);
+  finishWrite();
+  await countsReady;
+  assert.equal(state.articles.find(article => article.id === "one").isRead, true);
+  assert.equal(state.articles.find(article => article.id === "two").isRead, false);
+  assert.deepEqual(state.loadingChanges, []);
+  assert.deepEqual(state.continuationChanges, []);
+  finishCounts({ readingListUnreadCount: 2, feedUnreadCounts: { "feed/a": 0, "feed/b": 2 } });
+  await pending;
+  assert.equal(state.continuation, "next-page");
+  assert.equal(state.selected, "two");
+  assert.equal(state.refresh, 0);
+  assert.equal(state.sessions, 0);
+  assert.deepEqual(state.loadingChanges, []);
+  assert.deepEqual(state.continuationChanges, []);
+  assert.equal(state.requests.some(([kind]) => kind === "page"), false);
 });
 
 test("A scope change during the write prevents stale list replacement", async () => {
