@@ -772,6 +772,7 @@ button { font: inherit; }
 .article-context-star::before { position: absolute; width: 27px; height: 27px; border-radius: 50%; content: ""; background: transparent; }
 .article-context-star svg { position: relative; }
 .article-context-star.starred { color: #b9780e; }
+.article-context-star.starred svg { width: 14px; height: 14px; }
 .article-context-star.starred::before { background: #fff3cf; }
 @media (hover: hover) and (pointer: fine) {
   .article-context-menu > button:hover .article-context-star.starred { color: #9d6509; }
