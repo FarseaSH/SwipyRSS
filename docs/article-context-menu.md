@@ -37,6 +37,6 @@ For a system Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its executable pa
 
 The automated browser scenarios cover all four placements, natural hover restoration, retargeting, outside-click consumption, star state, inclusive Read Above (including previous screens), Feed confirmation/cancellation/navigation, single-feed contents, toolbar priority, all-mode position preservation, reader-return highlighting, actual Chromium touch long press, exact 6px cancellation, multi-touch, pointer cancellation and ordinary taps. Mobile emulation does not replace physical iOS/Android testing. Live FreshRSS write/rollback and partial refresh behavior are tested against controlled service boundaries, without modifying a real account.
 
-## Branch Site
+## Site builds
 
-`.openai/hosting.json` binds this branch to its own private Site. `npm run build:site` uses `/` for this Site while preserving the existing `/swipy/` default for other web deployments. GitHub `dev` is not modified by this branch.
+`npm run build:site` uses `/` as the deployment base. Local Sites hosting configuration belongs in the ignored `.openai/` directory and is not tracked in Git.
