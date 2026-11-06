@@ -97,7 +97,7 @@ export function KeyboardShortcutHelp({ view, mode, swipeMarkReadMode, disabled, 
     ["Esc", "退出 G / S 编号模式"],
     [`${modifier} + 点击文章`, "打开原文并标记已读"],
     ["L / →", "重新打开最近阅读的文章（可用时）"], ["/", "切换所有文章 / 未读文章"],
-    ["M", scope === "settings" ? "上方已读 / 全部已读（跟随工具栏，需确认）" : shouldMarkAboveRead(mode, swipeMarkReadMode) ? "确认当前屏及上方已读" : "确认当前范围全部已读（包括尚未加载的文章）"],
+    ["M", shouldMarkAboveRead() ? "确认当前屏及上方已读" : "确认当前范围全部已读（包括尚未加载的文章）"],
     ["R", "刷新当前列表"],
   ] });
   if (scope === "reader" || scope === "settings") sections.push({ title: "文章正文", rows: [

@@ -131,7 +131,7 @@ function orderFolderFeeds(
  */
 export function ArticleListPage(props: Props) {
   const listNow = props.listNow;
-  const markAboveRead = shouldMarkAboveRead(props.mode, props.swipeMarkReadMode);
+  const markAboveRead = shouldMarkAboveRead();
   const feedHomepage = useMemo(() => {
     if (props.isStarredList || !props.selectedFeed?.siteUrl) return undefined;
     try {
@@ -469,6 +469,7 @@ export function ArticleListPage(props: Props) {
    * The Read Above boundary ends at the last article on the current full screen, excluding the
    * translucent next-screen preview below.
    * “上方已读”的边界固定在当前完整屏末篇，不包含底部半透明的下一屏预览。
+   * 保留用于后续自定义工具栏；默认按钮使用“全部已读”。
    */
   const aboveUnreadArticleIds = useMemo(() => {
     if (!pageIsSettled) return [];

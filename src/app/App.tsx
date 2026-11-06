@@ -1048,10 +1048,14 @@ export default function App({ platform }: { platform: AppPlatform }) {
       setReadingListUnreadCount(previewArticles.filter((article) => !article.isRead).length);
       setFeedUnreadCounts(createPreviewFeedUnreadCounts(previewFeeds, previewArticles));
       recordFeedsMarkedRead(newlyReadFeedIds);
-      const visibleArticles = applyPreviewScope(scope, mode);
-      setSelectedId(visibleArticles[0]?.id ?? null);
-      beginReadingSession(scope, mode, true);
-      setListRefreshKey((key) => key + 1);
+      if (mode === "all") {
+        setArticles((current) => current.map((article) => ({ ...article, isRead: true })));
+      } else {
+        const visibleArticles = applyPreviewScope(scope, mode);
+        setSelectedId(visibleArticles[0]?.id ?? null);
+        beginReadingSession(scope, mode, true);
+        setListRefreshKey((key) => key + 1);
+      }
       return;
     }
 
@@ -1067,11 +1071,17 @@ export default function App({ platform }: { platform: AppPlatform }) {
     loadMoreRequestRef.current += 1;
     loadMoreInFlightRef.current = false;
     setLoadingMore(false);
-    setLoadingList(true);
+    // All mode uses the confirmation button's busy state without covering the retained list.
+    // 所有文章模式只显示确认按钮的处理状态，不显示列表加载遮罩。
+    if (targetMode === "unread") setLoadingList(true);
     unreadMutationVersionRef.current += 1;
 
     try {
       await trackWrite(rssClient.markStreamRead({ streamId, beforeTimestampUsec }));
+      // A late failure from an earlier single-article write must not undo this bulk success.
+      const operationId = ++mutationSequenceRef.current;
+      for (const article of articles) latestMutationRef.current.set(`read:${article.id}`, operationId);
+      unreadMutationVersionRef.current += 1;
       if (listSequence !== requestSequenceRef.current) {
         void reconcileUnreadCounts(false);
         return;
@@ -1097,23 +1107,28 @@ export default function App({ platform }: { platform: AppPlatform }) {
       setArticles((current) => targetMode === "unread"
         ? []
         : current.map((article) => ({ ...article, isRead: true })));
-      setContinuation(undefined);
-      if (targetMode === "unread") setSelectedId(null);
+      // All mode retains the loaded pages, selection and continuation. Only unread mode reloads.
+      // 所有文章模式只更新已读状态，保留列表位置和分页；未读模式才重新加载列表。
+      if (targetMode === "unread") {
+        setContinuation(undefined);
+        setSelectedId(null);
+      }
 
       const unreadSequence = ++unreadRefreshSequenceRef.current;
       const mutationVersion = unreadMutationVersionRef.current;
       unreadRefreshRequestedAtRef.current = Date.now();
       const [pageResult, unreadResult] = await Promise.allSettled([
-        rssClient.getStream({ streamId, unreadOnly: targetMode === "unread" }),
+        targetMode === "unread" ? rssClient.getStream({ streamId, unreadOnly: true }) : Promise.resolve(null),
         rssClient.refreshUnreadCounts(),
       ]);
       if (listSequence !== requestSequenceRef.current) return;
 
-      const pageIsFresh = pageResult.status === "fulfilled" && !pageResult.value.fromCache;
-      if (pageIsFresh) {
-        replaceArticleList(pageResult.value.items);
-        setContinuation(pageResult.value.continuation);
-        setSelectedId(pageResult.value.items[0]?.id ?? null);
+      const freshPage = pageResult.status === "fulfilled" && pageResult.value && !pageResult.value.fromCache
+        ? pageResult.value : null;
+      if (freshPage) {
+        replaceArticleList(freshPage.items);
+        setContinuation(freshPage.continuation);
+        setSelectedId(freshPage.items[0]?.id ?? null);
       }
 
       const countsAreFresh = unreadResult.status === "fulfilled"
@@ -1124,9 +1139,11 @@ export default function App({ platform }: { platform: AppPlatform }) {
         setFeedUnreadCounts(unreadResult.value.feedUnreadCounts);
       }
 
-      beginReadingSession(targetScope, targetMode, true);
-      setListRefreshKey((key) => key + 1);
-      if (!pageIsFresh || !countsAreFresh) {
+      if (targetMode === "unread") {
+        beginReadingSession(targetScope, targetMode, true);
+        setListRefreshKey((key) => key + 1);
+      }
+      if ((targetMode === "unread" && !freshPage) || !countsAreFresh) {
         notify("已全部标记为已读，但部分列表信息刷新失败");
       }
     } catch (error) {
@@ -1135,7 +1152,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
       }
       throw error;
     } finally {
-      if (listSequence === requestSequenceRef.current) setLoadingList(false);
+      if (targetMode === "unread" && listSequence === requestSequenceRef.current) setLoadingList(false);
     }
   }, [applyPreviewScope, articles, beginReadingSession, feedUnreadCounts, folders, mode, notify, previewMode, reconcileUnreadCounts, recordFeedsMarkedRead, scope, rssClient, replaceArticleList, trackWrite]);
 
