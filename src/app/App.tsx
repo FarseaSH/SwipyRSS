@@ -312,12 +312,14 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
   const [articleListRevision, setArticleListRevision] = useState(0);
+  const [reopenableReaderId, setReopenableReaderId] = useState<string | null>(null);
   const listNow = useListDate();
   const timeSectionLabels = useArticleTimeSections(articles, articleListRevision, listNow);
   // Reset only after a successful replacement; failed refreshes keep the frozen timeline.
   const replaceArticleList = useCallback((items: Article[]) => {
     setArticles(items);
     setArticleListRevision((revision) => revision + 1);
+    setReopenableReaderId(null);
   }, []);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [folders, setFolders] = useState<FeedFolder[]>([]);
@@ -338,7 +340,6 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [returnHighlight, setReturnHighlight] = useState<{ id: string; sequence: number } | null>(null);
   const [readerResetKey, setReaderResetKey] = useState(0);
   const [listRefreshKey, setListRefreshKey] = useState(0);
-  const [canReopenReader, setCanReopenReader] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [listHorizontalBlockKey, setListHorizontalBlockKey] = useState(0);
   const [toast, setToast] = useState("");
@@ -346,7 +347,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const closeShortcutHelp = useCallback(() => setShortcutHelpOpen(false), []);
   const openSettings = useCallback(() => {
-    setCanReopenReader(false);
+    setReopenableReaderId(null);
     setSidebarOpen(false);
     setView("settings");
   }, []);
@@ -498,6 +499,11 @@ export default function App({ platform }: { platform: AppPlatform }) {
     readerBackPendingRef.current = false;
   }, []);
 
+  const selectedArticle = articles.find((article) => article.id === selectedId) ?? articles[0] ?? null;
+  const retainedReaderId = view === "list" && reopenableReaderId === selectedId
+    && reopenableReaderId === selectedArticle?.id ? reopenableReaderId : null;
+  const canReopenReader = retainedReaderId !== null;
+
   /**
    * Share list restoration and article highlighting across return actions while preserving toolbar
    * state.
@@ -509,8 +515,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
       setReturnHighlight({ id: selectedId, sequence: returnHighlightSequenceRef.current });
     }
     setView("list");
-    setCanReopenReader(true);
-  }, [selectedId]);
+    setReopenableReaderId(selectedArticle?.id === selectedId ? selectedId : null);
+  }, [selectedArticle?.id, selectedId]);
   /**
    * Return to the list and consume the reader history entry so browser and in-app back actions stay
    * consistent.
@@ -543,11 +549,15 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * Restore the reader that was just closed and consume this forward navigation opportunity.
    * 恢复刚关闭的正文页，并消费这一次前进导航机会。
    */
-  const reopenReader = useCallback(() => {
-    if (selectedId) recordReaderHistory(selectedId);
-    setCanReopenReader(false);
+  const showRetainedReader = useCallback(() => {
+    setReopenableReaderId(null);
     setView("reader");
-  }, [recordReaderHistory, selectedId]);
+  }, []);
+  const reopenReader = useCallback(() => {
+    if (retainedReaderId === null) return;
+    recordReaderHistory(retainedReaderId);
+    showRetainedReader();
+  }, [recordReaderHistory, retainedReaderId, showRetainedReader]);
 
   useSidebarSwipe(
     mainRef,
@@ -610,7 +620,6 @@ export default function App({ platform }: { platform: AppPlatform }) {
   const markAllReadScopeName = selectedFeed?.title
     ?? selectedFolder?.name
     ?? (scope.kind === "starred" ? "星标文章" : "所有文章");
-  const selectedArticle = articles.find((article) => article.id === selectedId) ?? articles[0] ?? null;
   const selectedVisibleIndex = selectedArticle ? articles.findIndex((article) => article.id === selectedArticle.id) : -1;
   const previousArticle = selectedVisibleIndex > 0 ? articles[selectedVisibleIndex - 1] : null;
   const nextArticle = selectedVisibleIndex >= 0 && selectedVisibleIndex < articles.length - 1
@@ -709,7 +718,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     beginReadingSession(nextScope, resolvedMode);
     setScope(nextScope);
     setMode(resolvedMode);
-    setCanReopenReader(false);
+    setReopenableReaderId(null);
     setView("list");
 
     if (previewMode) applyPreviewScope(nextScope, resolvedMode);
@@ -1460,7 +1469,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     setSelectedId(id);
     setReturnHighlight(null);
     setReaderResetKey((key) => key + 1);
-    setCanReopenReader(false);
+    setReopenableReaderId(null);
     setView("reader");
     window.scrollTo({ top: 0 });
   }, [articles, commitArticleState]);
@@ -1471,9 +1480,13 @@ export default function App({ platform }: { platform: AppPlatform }) {
    * 用户打开文章时记录历史；浏览器前进只恢复已有记录。
    */
   const openArticle = useCallback((id: string) => {
+    if (id === retainedReaderId) {
+      reopenReader();
+      return;
+    }
     recordReaderHistory(id);
     openArticleContent(id);
-  }, [openArticleContent, recordReaderHistory]);
+  }, [openArticleContent, recordReaderHistory, reopenReader, retainedReaderId]);
 
   /**
    * Consume reader history on system back; the next back action from the list remains the browser's
@@ -1490,7 +1503,8 @@ export default function App({ platform }: { platform: AppPlatform }) {
       if (marker?.session === readerHistorySessionRef.current
         && marker.articleId && articles.some((article) => article.id === marker.articleId)) {
         readerHistoryActiveRef.current = true;
-        openArticleContent(marker.articleId);
+        if (marker.articleId === retainedReaderId) showRetainedReader();
+        else openArticleContent(marker.articleId);
       } else {
         const wasReader = readerHistoryActiveRef.current;
         readerHistoryActiveRef.current = false;
@@ -1499,7 +1513,7 @@ export default function App({ platform }: { platform: AppPlatform }) {
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [articles, openArticleContent, restoreArticleList]);
+  }, [articles, openArticleContent, restoreArticleList, retainedReaderId, showRetainedReader]);
 
   /**
    * Append a page using the current continuation and deduplicate articles by ID. A synchronous ref
